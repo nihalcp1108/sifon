@@ -1,0 +1,22 @@
+{
+  "name": "sifon-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sifon - Production-ready Stock Management System",
+  "scripts": {
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:mongo": "cd backend && npm run dev:mongo",
+    "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"blue,green\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "build": "cd backend && npm run build && cd ../frontend && npm run build",
+    "test:backend": "cd backend && npm run test",
+    "reconcile": "cd backend && npm run reconcile",
+    "seed": "cd backend && npm run seed",
+    "create-admin": "cd backend && npm run create-admin"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
+

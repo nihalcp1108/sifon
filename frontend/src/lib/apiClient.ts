@@ -1,0 +1,58 @@
+import axios, { AxiosError } from 'axios';
+
+/**
+ * Resolves the centralized API base URL.
+ * Supports VITE_API_URL and VITE_API_BASE_URL, trims trailing slashes,
+ * and ensures the correct /api/v1 prefix without duplicates.
+ */
+function resolveApiBaseUrl(): string {
+  const envUrl = (
+    import.meta.env.VITE_API_URL ||
+    import.meta.env.VITE_API_BASE_URL ||
+    'http://localhost:5000/api/v1'
+  ).trim();
+
+  const cleanUrl = envUrl.replace(/\/+$/, '');
+
+  if (cleanUrl.endsWith('/api/v1')) {
+    return cleanUrl;
+  }
+  if (cleanUrl.endsWith('/api')) {
+    return `${cleanUrl}/v1`;
+  }
+  return `${cleanUrl}/api/v1`;
+}
+
+export const apiClient = axios.create({
+  baseURL: resolveApiBaseUrl(),
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest',
+  },
+});
+
+// Response interceptor for unified error formatting & session expiry handling
+apiClient.interceptors.response.use(
+  response => response,
+  (error: AxiosError<any>) => {
+    const errorData = error.response?.data;
+    const message = errorData?.message || error.message || 'An unexpected error occurred';
+
+    // Enrich error message
+    error.message = message;
+
+    // Handle session expiry gracefully without redirect loops
+    if (
+      error.response?.status === 401 &&
+      typeof window !== 'undefined' &&
+      window.location.pathname !== '/login' &&
+      !error.config?.url?.includes('/auth/me') &&
+      !error.config?.url?.includes('/auth/login')
+    ) {
+      window.location.href = '/login';
+    }
+
+    return Promise.reject(error);
+  }
+);
