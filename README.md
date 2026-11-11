@@ -475,12 +475,30 @@ npm run start
 # or: node dist/server.js
 ```
 
-### 5. SPA Static Hosting & Production Preview
+### 5. Deploying Frontend on Vercel
+
+Sifon's frontend deploys seamlessly to [Vercel](https://vercel.com) as an independent Vite SPA. The repository includes [`frontend/vercel.json`](./frontend/vercel.json) to handle Single Page Application (SPA) client-side routing rewrites so that direct route navigation and page refreshes never return 404.
+
+#### Vercel Project Settings
+1. In Vercel Dashboard, click **Add New...** $\to$ **Project**, then import your GitHub repository (`https://github.com/nihalcp1108/sifon.git`).
+2. In the project configuration screen:
+   - **Framework Preset**: `Vite`
+   - **Root Directory**: Click **Edit** and select `frontend` (do **not** leave as repository root)
+   - **Build Command**: `npm run build` (or default `vite build`)
+   - **Output Directory**: `dist`
+   - **Install Command**: `npm install` (or `npm ci`)
+3. Under **Environment Variables**, add:
+   - `VITE_API_URL`: `https://<your-railway-backend-domain>/api/v1` (point to your deployed Railway backend)
+   - `VITE_APP_NAME`: `Sifon` (optional)
+4. Click **Deploy**.
+5. Once deployed, copy your Vercel domain (e.g. `https://sifon-frontend.vercel.app`) and add it to your Railway backend's `FRONTEND_URL` environment variable to ensure CORS cookies are accepted.
+
+### 6. SPA Static Hosting & Production Preview
 To preview the production frontend build locally:
 ```bash
 npm --prefix frontend run preview
 ```
-For production hosting, serve the `frontend/dist` directory using NGINX, Caddy, Cloudflare Pages, or AWS S3/CloudFront. Remember that client-side routes require SPA fallback to `index.html`.
+For other production hosting providers (NGINX, Caddy, Cloudflare Pages, AWS S3/CloudFront), ensure all non-file requests rewrite to `/index.html`.
 
 ---
 
