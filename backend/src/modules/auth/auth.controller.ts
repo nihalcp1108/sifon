@@ -11,9 +11,21 @@ function getCookieOptions() {
   return {
     httpOnly: true,
     secure: isProduction,
-    sameSite: 'lax' as const,
+    sameSite: (isProduction ? 'none' : 'lax') as 'none' | 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     path: '/',
+    partitioned: isProduction ? true : undefined,
+  };
+}
+
+function getClearCookieOptions() {
+  const isProduction = env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: (isProduction ? 'none' : 'lax') as 'none' | 'lax',
+    path: '/',
+    partitioned: isProduction ? true : undefined,
   };
 }
 
@@ -46,6 +58,8 @@ export class AuthController {
   static async me(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const user = req.user!;
+      const token = req.cookies?.[COOKIE_NAME] ||
+        (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.split(' ')[1] : undefined);
       return sendSuccess(res, {
         user: {
           id: user._id,
@@ -53,6 +67,7 @@ export class AuthController {
           name: user.name,
           role: user.role,
         },
+        token,
       });
     } catch (error) {
       next(error);
@@ -61,12 +76,7 @@ export class AuthController {
 
   static async logout(_req: Request, res: Response, next: NextFunction) {
     try {
-      res.clearCookie(COOKIE_NAME, {
-        httpOnly: true,
-        secure: env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-      });
+      res.clearCookie(COOKIE_NAME, getClearCookieOptions());
       return sendSuccess(res, { message: 'Logged out successfully' });
     } catch (error) {
       next(error);
@@ -79,12 +89,7 @@ export class AuthController {
       await AuthService.changeEmail(user._id, req.body);
 
       // Invalidate existing session cookie
-      res.clearCookie(COOKIE_NAME, {
-        httpOnly: true,
-        secure: env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-      });
+      res.clearCookie(COOKIE_NAME, getClearCookieOptions());
 
       return sendSuccess(
         res,
@@ -102,12 +107,7 @@ export class AuthController {
       await AuthService.changePassword(user._id, req.body);
 
       // Invalidate existing session cookie
-      res.clearCookie(COOKIE_NAME, {
-        httpOnly: true,
-        secure: env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-      });
+      res.clearCookie(COOKIE_NAME, getClearCookieOptions());
 
       return sendSuccess(
         res,

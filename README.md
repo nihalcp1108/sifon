@@ -453,7 +453,7 @@ Sifon's backend deploys seamlessly to [Railway](https://railway.com) as a standa
    - `MONGODB_URI`: `<your-production-mongodb-atlas-uri>`
    - `JWT_SECRET`: `<minimum-32-character-random-secret>`
    - `COOKIE_SECRET`: `<random-secret>`
-   - `FRONTEND_URL`: `https://your-frontend-domain.com`
+   - `FRONTEND_URL`: `https://your-vercel-domain.vercel.app` (e.g. `https://sifon.vercel.app`; supports comma-separated list of domains; do not include trailing slash)
    - `INITIAL_ADMIN_EMAIL`: `admin@sifon.local` (optional)
    - `INITIAL_ADMIN_PASSWORD`: `<strong-admin-password>` (optional)
    - `INITIAL_ADMIN_NAME`: `Super Admin`

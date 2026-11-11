@@ -9,7 +9,7 @@ function resolveApiBaseUrl(): string {
   const envUrl = (
     import.meta.env.VITE_API_URL ||
     import.meta.env.VITE_API_BASE_URL ||
-    'http://localhost:5000/api/v1'
+    (import.meta.env.PROD ? '/api/v1' : 'http://localhost:5000/api/v1')
   ).trim();
 
   const cleanUrl = envUrl.replace(/\/+$/, '');
@@ -32,6 +32,25 @@ export const apiClient = axios.create({
   },
 });
 
+// In-memory token storage (never stored in localStorage, strictly in JS execution memory)
+let inMemoryToken: string | null = null;
+
+export function setAuthToken(token: string | null): void {
+  inMemoryToken = token;
+}
+
+export function getAuthToken(): string | null {
+  return inMemoryToken;
+}
+
+// Request interceptor to attach Bearer token when available in memory
+apiClient.interceptors.request.use((config) => {
+  if (inMemoryToken && !config.headers.Authorization) {
+    config.headers.Authorization = `Bearer ${inMemoryToken}`;
+  }
+  return config;
+});
+
 // Response interceptor for unified error formatting & session expiry handling
 apiClient.interceptors.response.use(
   response => response,
@@ -42,7 +61,7 @@ apiClient.interceptors.response.use(
     // Enrich error message
     error.message = message;
 
-    // Handle session expiry gracefully without redirect loops
+    // Handle session expiry gracefully without hard browser reload loops
     if (
       error.response?.status === 401 &&
       typeof window !== 'undefined' &&
@@ -50,7 +69,8 @@ apiClient.interceptors.response.use(
       !error.config?.url?.includes('/auth/me') &&
       !error.config?.url?.includes('/auth/login')
     ) {
-      window.location.href = '/login';
+      setAuthToken(null);
+      window.dispatchEvent(new CustomEvent('sifon:unauthorized'));
     }
 
     return Promise.reject(error);

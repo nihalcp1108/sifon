@@ -11,8 +11,8 @@ export const authApi = {
   },
 
   me: async () => {
-    const res = await apiClient.get<{ data: { user: User } }>('/auth/me');
-    return res.data.data.user;
+    const res = await apiClient.get<{ data: { user: User; token?: string } }>('/auth/me');
+    return res.data.data;
   },
 
   logout: async () => {

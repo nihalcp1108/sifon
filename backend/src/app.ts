@@ -21,6 +21,9 @@ import reportsRouter from './modules/reports/report.router.js';
 export function createApp(): express.Application {
   const app = express();
 
+  // Trust reverse proxy (Railway, Render, Cloudflare) for secure cookie handling and HTTPS protocol detection
+  app.set('trust proxy', 1);
+
   // Security headers via Helmet
   app.use(
     helmet({
@@ -43,11 +46,12 @@ export function createApp(): express.Application {
         if (!origin) {
           return callback(null, true);
         }
-        const normalized = origin.replace(/\/+$/, '');
-        if (allowedOrigins.includes(normalized)) {
+        const normalized = origin.replace(/\/+$/, '').toLowerCase();
+        const isAllowed = allowedOrigins.some(allowed => allowed.toLowerCase() === normalized);
+        if (isAllowed) {
           callback(null, true);
         } else {
-          callback(new Error(`Origin ${origin} not allowed by CORS`));
+          callback(null, false);
         }
       },
       credentials: true,
