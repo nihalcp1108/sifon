@@ -417,7 +417,7 @@ The repository includes a ready-to-use [`render.yaml`](./render.yaml) file:
    - **Root Directory**: `backend`
    - **Runtime**: `Node`
    - **Build Command**: `npm ci --include=dev && npm run build`
-   - **Start Command**: `npm start`
+   - **Start Command**: `node dist/server.js` (or `npm start`)
    - **Plan**: `Free`
 4. Under **Advanced** $\to$ **Health Check Path**, enter: `/api/v1/health`
 5. Configure Environment Variables:
@@ -444,7 +444,7 @@ Sifon's backend deploys seamlessly to [Railway](https://railway.com) as a standa
 4. Under **Build**:
    - **Build Command**: `npm ci --include=dev && npm run build` (or leave default; handled automatically by `backend/railway.json` and `backend/.npmrc`)
 5. Under **Deploy**:
-   - **Start Command**: `npm start`
+   - **Start Command**: `node dist/server.js` (or `npm start`)
    - **Healthcheck Path**: `/api/v1/health`
 6. Under **Variables**, add the following environment variables:
    - `NODE_ENV`: `production`
