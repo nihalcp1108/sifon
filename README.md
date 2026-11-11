@@ -432,7 +432,38 @@ The repository includes a ready-to-use [`render.yaml`](./render.yaml) file:
    - `INITIAL_ADMIN_PASSWORD`: `<strong-admin-password>` (optional, for first startup)
    - `INITIAL_ADMIN_NAME`: `Super Admin`
 
-### 3. Start Backend Locally in Production
+### 3. Deploying Backend on Railway
+
+Sifon's backend deploys seamlessly to [Railway](https://railway.com) as a standalone service. The repository includes dual `railway.json` and `.npmrc` configurations to ensure reproducible builds whether Railway builds from `/backend` or `/` (repository root).
+
+#### Recommended Setup (Root Directory: `/backend`)
+1. In Railway Dashboard, create a new project and select **Deploy from GitHub repo**.
+2. Connect `https://github.com/nihalcp1108/sifon.git`.
+3. In your Railway Service, navigate to **Settings** $\to$ **Source**:
+   - Set **Root Directory** to: `/backend`
+4. Under **Build**:
+   - **Build Command**: `npm ci --include=dev && npm run build` (or leave default; handled automatically by `backend/railway.json` and `backend/.npmrc`)
+5. Under **Deploy**:
+   - **Start Command**: `npm start`
+   - **Healthcheck Path**: `/api/v1/health`
+6. Under **Variables**, add the following environment variables:
+   - `NODE_ENV`: `production`
+   - `PORT`: `${{PORT}}` (Railway assigns this automatically)
+   - `TIMEZONE`: `Asia/Kolkata`
+   - `MONGODB_URI`: `<your-production-mongodb-atlas-uri>`
+   - `JWT_SECRET`: `<minimum-32-character-random-secret>`
+   - `COOKIE_SECRET`: `<random-secret>`
+   - `FRONTEND_URL`: `https://your-frontend-domain.com`
+   - `INITIAL_ADMIN_EMAIL`: `admin@sifon.local` (optional)
+   - `INITIAL_ADMIN_PASSWORD`: `<strong-admin-password>` (optional)
+   - `INITIAL_ADMIN_NAME`: `Super Admin`
+
+#### Root Directory Deployment (`/`)
+If deploying without specifying a root directory (from repository root `/`), Sifon automatically handles this via root `railway.json`, `.npmrc`, and root `build` script:
+- Root `railway.json` instructs Nixpacks to run `npm --prefix backend ci --include=dev && npm --prefix backend run build` and starts with `npm --prefix backend start`.
+- Root `package.json` `"build"` script installs backend dependencies with `--include=dev` and compiles TypeScript to `backend/dist`, preventing `tsc: not found` errors.
+
+### 4. Start Backend Locally in Production
 Ensure production environment variables are configured in `backend/.env` (with `NODE_ENV=production`), then run:
 ```bash
 # Option A: From project root
@@ -444,7 +475,7 @@ npm run start
 # or: node dist/server.js
 ```
 
-### 3. SPA Static Hosting & Production Preview
+### 5. SPA Static Hosting & Production Preview
 To preview the production frontend build locally:
 ```bash
 npm --prefix frontend run preview
