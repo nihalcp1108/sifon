@@ -4,16 +4,20 @@
   "private": true,
   "description": "Sifon - Production-ready Stock Management System",
   "scripts": {
-    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
-    "dev:backend": "cd backend && npm run dev",
-    "dev:frontend": "cd frontend && npm run dev",
-    "dev:mongo": "cd backend && npm run dev:mongo",
+    "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:mongo": "npm --prefix backend run dev:mongo",
     "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"blue,green\" \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "build": "cd backend && npm run build && cd ../frontend && npm run build",
-    "test:backend": "cd backend && npm run test",
-    "reconcile": "cd backend && npm run reconcile",
-    "seed": "cd backend && npm run seed",
-    "create-admin": "cd backend && npm run create-admin"
+    "build:backend": "npm --prefix backend run build",
+    "build:frontend": "npm --prefix frontend run build",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "start:backend": "npm --prefix backend start",
+    "start": "npm --prefix backend start",
+    "test:backend": "npm --prefix backend run test",
+    "reconcile": "npm --prefix backend run reconcile",
+    "seed": "npm --prefix backend run seed",
+    "create-admin": "npm --prefix backend run create-admin"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

@@ -396,7 +396,43 @@ This runs:
 - `cd backend && npm run build` (outputs compiled JavaScript to `backend/dist`)
 - `cd frontend && npm run build` (runs `tsc -b && vite build`, embedding `VITE_*` variables into `frontend/dist`)
 
-### 2. Start Backend in Production
+### 2. Deploying Backend on Render (Web Service)
+
+Sifon's backend is a self-contained Node.js service that deploys seamlessly to [Render](https://render.com).
+
+#### Option A: Automatic Deployment using Render Blueprints
+The repository includes a ready-to-use [`render.yaml`](./render.yaml) file:
+1. In Render Dashboard, click **New +** $\to$ **Blueprint**.
+2. Connect your repository (`https://github.com/nihalcp1108/sifon.git`).
+3. Render automatically reads `render.yaml` and provisions the Web Service with the correct configuration.
+4. Set your `MONGODB_URI` and `FRONTEND_URL` in the environment settings.
+
+#### Option B: Manual Web Service Setup
+1. In Render Dashboard, click **New +** $\to$ **Web Service**.
+2. Connect your repository.
+3. Configure settings:
+   - **Name**: `sifon-backend`
+   - **Region**: Any (e.g. `Oregon (US West)` or `Frankfurt (EU Central)`)
+   - **Branch**: `main`
+   - **Root Directory**: `backend`
+   - **Runtime**: `Node`
+   - **Build Command**: `npm ci --include=dev && npm run build`
+   - **Start Command**: `npm start`
+   - **Plan**: `Free`
+4. Under **Advanced** $\to$ **Health Check Path**, enter: `/api/v1/health`
+5. Configure Environment Variables:
+   - `NODE_ENV`: `production`
+   - `PORT`: `10000` (Render default)
+   - `TIMEZONE`: `Asia/Kolkata`
+   - `MONGODB_URI`: `<your-production-mongodb-atlas-uri>`
+   - `JWT_SECRET`: `<minimum-32-character-random-secret>`
+   - `COOKIE_SECRET`: `<random-secret>`
+   - `FRONTEND_URL`: `https://your-frontend-domain.com`
+   - `INITIAL_ADMIN_EMAIL`: `admin@sifon.local` (optional, for first startup)
+   - `INITIAL_ADMIN_PASSWORD`: `<strong-admin-password>` (optional, for first startup)
+   - `INITIAL_ADMIN_NAME`: `Super Admin`
+
+### 3. Start Backend Locally in Production
 Ensure production environment variables are configured in `backend/.env` (with `NODE_ENV=production`), then run:
 ```bash
 # Option A: From project root

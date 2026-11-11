@@ -31,8 +31,8 @@ async function bootstrap() {
     }
 
     const app = createApp();
-    const server = app.listen(env.PORT, () => {
-      console.log(`[Sifon] Server running on http://localhost:${env.PORT}`);
+    const server = app.listen(env.PORT, '0.0.0.0', () => {
+      console.log(`[Sifon] Server running on http://0.0.0.0:${env.PORT}`);
       console.log(`[Sifon] API Base URL: http://localhost:${env.PORT}/api/v1`);
       console.log(`[Sifon] Business Timezone: ${env.TIMEZONE}`);
       console.log(`[Sifon] Allowed Frontend Origin: ${env.FRONTEND_URL}`);
