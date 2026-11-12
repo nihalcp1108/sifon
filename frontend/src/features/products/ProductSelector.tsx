@@ -93,7 +93,8 @@ export const ProductSelector = React.forwardRef<HTMLSelectElement, ProductSelect
       return products.filter(
         p =>
           p.name.toLowerCase().includes(lower) ||
-          p.code.toLowerCase().includes(lower) ||
+          (p.brand?.name && p.brand.name.toLowerCase().includes(lower)) ||
+          (p.category?.name && p.category.name.toLowerCase().includes(lower)) ||
           (p.details && p.details.toLowerCase().includes(lower))
       );
     }, [products, searchTerm]);
@@ -119,7 +120,7 @@ export const ProductSelector = React.forwardRef<HTMLSelectElement, ProductSelect
 
     // Compute stock display text for an option in the list
     const getOptionLabel = (p: Product) => {
-      const codePart = `(${p.code})`;
+      const brandStr = p.brand?.name ? ` [${p.brand.name}]` : '';
       if (mode === 'sale') {
         if (selectedAreaId && p.areaBalances) {
           const bal = p.areaBalances.find((b: any) => {
@@ -127,18 +128,18 @@ export const ProductSelector = React.forwardRef<HTMLSelectElement, ProductSelect
             return bId === selectedAreaId;
           });
           const qty = bal?.availableQuantity ?? 0;
-          return `${p.name} ${codePart} — ${qty > 0 ? `${qty} ${p.unit} in Area` : 'Out of stock in Area'}`;
+          return `${p.name}${brandStr} — ${qty > 0 ? `${qty} ${p.unit} in Area` : 'Out of stock in Area'}`;
         }
         const total = p.totalAvailable ?? 0;
-        return `${p.name} ${codePart} — Total: ${total} ${p.unit} avail`;
+        return `${p.name}${brandStr} — Total: ${total} ${p.unit} avail`;
       }
 
       if (mode === 'purchase') {
         const total = p.totalAvailable ?? 0;
-        return `${p.name} ${codePart} — ${p.unit} (Stock: ${total})`;
+        return `${p.name}${brandStr} — ${p.unit} (Stock: ${total})`;
       }
 
-      return `${p.name} ${codePart}`;
+      return `${p.name}${brandStr}`;
     };
 
     return (
@@ -203,7 +204,7 @@ export const ProductSelector = React.forwardRef<HTMLSelectElement, ProductSelect
                   type="text"
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
-                  placeholder="Filter product by name or code..."
+                  placeholder="Filter products..."
                   className="w-full pl-8 pr-3 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-md text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-navy-600 placeholder-slate-400 transition-colors"
                   disabled={disabled || isLoading}
                 />
@@ -258,7 +259,10 @@ export const ProductSelector = React.forwardRef<HTMLSelectElement, ProductSelect
         {mode === 'sale' && selectedProduct && (
           <div className="text-xs px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg flex flex-wrap items-center justify-between gap-1">
             <span className="text-slate-600">
-              SKU: <strong className="font-mono text-slate-800">{selectedProduct.code}</strong> ({selectedProduct.unit})
+              Unit: <strong className="text-slate-800 font-semibold">{selectedProduct.unit}</strong>
+              {selectedProduct.brand?.name && (
+                <> • Brand: <strong className="text-slate-800 font-semibold">{selectedProduct.brand.name}</strong></>
+              )}
             </span>
             {selectedAreaId ? (
               <span

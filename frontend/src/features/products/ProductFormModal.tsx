@@ -2,21 +2,20 @@ import React, { useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Trash2, Info } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Plus, Trash2, Info, AlertCircle } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
 import { Select } from '../../components/common/Select';
 import { Product, Area } from '../../types';
+import { brandsApi } from '../brands/brandsApi';
+import { categoriesApi } from '../categories/categoriesApi';
 
 const productSchema = z.object({
-  code: z
-    .string()
-    .trim()
-    .min(1, 'Product code/SKU is required')
-    .max(50)
-    .toUpperCase(),
   name: z.string().trim().min(1, 'Product name is required').max(200),
+  brandId: z.string({ required_error: 'Brand is required' }).trim().min(1, 'Please select a brand'),
+  categoryId: z.string({ required_error: 'Category is required' }).trim().min(1, 'Please select a category'),
   details: z.string().trim().max(1000).optional(),
   unit: z.string().trim().min(1).default('pcs'),
   openingStock: z
@@ -53,6 +52,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     control,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
@@ -62,6 +63,25 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     },
   });
 
+  const selectedBrandId = watch('brandId');
+  const selectedCategoryId = watch('categoryId');
+
+  // Load Brand and Category options
+  const { data: brandsData, isLoading: loadingBrands } = useQuery({
+    queryKey: ['brands', 'options'],
+    queryFn: () => brandsApi.getBrandOptions({ limit: 200, activeOnly: 'true' }),
+    enabled: isOpen,
+  });
+
+  const { data: categoriesData, isLoading: loadingCategories } = useQuery({
+    queryKey: ['categories', 'options'],
+    queryFn: () => categoriesApi.getCategoryOptions({ limit: 200, activeOnly: 'true' }),
+    enabled: isOpen,
+  });
+
+  const brands = brandsData?.data || [];
+  const categories = categoriesData?.data || [];
+
   const { fields, append, remove } = useFieldArray({
     control,
     name: 'openingStock',
@@ -69,17 +89,29 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   useEffect(() => {
     if (editingProduct) {
+      const bId =
+        typeof editingProduct.brandId === 'object' && editingProduct.brandId
+          ? (editingProduct.brandId as any)._id
+          : (editingProduct.brandId as string) || '';
+
+      const cId =
+        typeof editingProduct.categoryId === 'object' && editingProduct.categoryId
+          ? (editingProduct.categoryId as any)._id
+          : (editingProduct.categoryId as string) || '';
+
       reset({
-        code: editingProduct.code,
         name: editingProduct.name,
+        brandId: bId,
+        categoryId: cId,
         details: editingProduct.details || '',
         unit: editingProduct.unit || 'pcs',
         openingStock: [],
       });
     } else {
       reset({
-        code: '',
         name: '',
+        brandId: '',
+        categoryId: '',
         details: '',
         unit: 'pcs',
         openingStock: [],
@@ -88,61 +120,123 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   }, [editingProduct, reset, isOpen]);
 
   const handleFormSubmit = async (data: ProductFormData) => {
-    // Filter out opening stock if empty or editing
     const payload = editingProduct
       ? {
           name: data.name,
+          brandId: data.brandId,
+          categoryId: data.categoryId,
           details: data.details,
           unit: data.unit,
         }
       : {
-          ...data,
-          openingStock: data.openingStock?.filter(o => o.areaId && o.quantity > 0),
+          name: data.name,
+          brandId: data.brandId,
+          categoryId: data.categoryId,
+          details: data.details,
+          unit: data.unit,
+          openingStock: data.openingStock?.filter((o) => o.areaId && o.quantity > 0),
         };
 
     await onSubmit(payload);
     onClose();
   };
 
-  const activeAreas = areas.filter(a => a.isActive);
+  const activeAreas = areas.filter((a) => a.isActive);
+  const noBrandsOrCategories = !loadingBrands && !loadingCategories && (brands.length === 0 || categories.length === 0);
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={editingProduct ? `Edit Product: ${editingProduct.code}` : 'Add New Product'}
+      title={editingProduct ? `Edit Product: ${editingProduct.name}` : 'Add New Product'}
       description={
         editingProduct
-          ? 'Update product details. Inventory balances cannot be edited directly.'
-          : 'Define product master record with optional opening stock per area'
+          ? 'Update product specifications, brand, or category. Stock balances cannot be edited directly.'
+          : 'Define product master record with brand, category, and optional initial opening stock'
       }
       maxWidth="lg"
     >
       <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input
-            label="Product Code / SKU"
-            placeholder="e.g. VALVE-SS-01"
-            disabled={!!editingProduct}
-            error={errors.code?.message}
-            helperText={editingProduct ? 'SKU is permanent' : 'Uppercase alphanumeric identifier'}
-            {...register('code')}
-          />
-
-          <Input
-            label="Unit of Measure"
-            placeholder="pcs, units, box, kg"
-            error={errors.unit?.message}
-            {...register('unit')}
-          />
-        </div>
+        {/* Warning if no brands or categories exist */}
+        {!editingProduct && noBrandsOrCategories && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2.5 text-xs text-amber-800">
+            <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-semibold">Brands and Categories required</p>
+              <p className="mt-0.5">
+                {brands.length === 0 && categories.length === 0
+                  ? 'Please create at least one Brand and one Category from the sidebar before adding products.'
+                  : brands.length === 0
+                  ? 'Please create at least one Brand from the Brands page before adding products.'
+                  : 'Please create at least one Category from the Categories page before adding products.'}
+              </p>
+            </div>
+          </div>
+        )}
 
         <Input
           label="Product Name"
           placeholder="e.g. Stainless Steel Ball Valve 2 inch"
           error={errors.name?.message}
+          required
+          autoFocus
           {...register('name')}
         />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="product-brand-select" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+              Brand <span className="text-rose-500">*</span>
+            </label>
+            <select
+              id="product-brand-select"
+              className={`w-full px-3 py-2 bg-white border rounded-lg text-sm text-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-navy-700 ${
+                errors.brandId ? 'border-rose-400 focus:ring-rose-200' : 'border-slate-300'
+              }`}
+              value={selectedBrandId || ''}
+              onChange={(e) => setValue('brandId', e.target.value, { shouldValidate: true })}
+            >
+              <option value="">-- Select Brand --</option>
+              {brands.map((b) => (
+                <option key={b._id} value={b._id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+            {errors.brandId && <p className="mt-1 text-xs text-rose-500">{errors.brandId.message}</p>}
+          </div>
+
+          <div>
+            <label htmlFor="product-category-select" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+              Category <span className="text-rose-500">*</span>
+            </label>
+            <select
+              id="product-category-select"
+              className={`w-full px-3 py-2 bg-white border rounded-lg text-sm text-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-navy-700 ${
+                errors.categoryId ? 'border-rose-400 focus:ring-rose-200' : 'border-slate-300'
+              }`}
+              value={selectedCategoryId || ''}
+              onChange={(e) => setValue('categoryId', e.target.value, { shouldValidate: true })}
+            >
+              <option value="">-- Select Category --</option>
+              {categories.map((c) => (
+                <option key={c._id} value={c._id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            {errors.categoryId && <p className="mt-1 text-xs text-rose-500">{errors.categoryId.message}</p>}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Input
+            label="Unit of Measure"
+            placeholder="pcs, units, box, kg, pairs"
+            error={errors.unit?.message}
+            {...register('unit')}
+          />
+        </div>
 
         <div>
           <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
@@ -197,7 +291,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         {...register(`openingStock.${idx}.areaId`)}
                         error={errors.openingStock?.[idx]?.areaId?.message}
                       >
-                        {activeAreas.map(a => (
+                        {activeAreas.map((a) => (
                           <option key={a._id} value={a._id}>
                             {a.displayName} {a.description ? `(${a.description})` : ''}
                           </option>
@@ -212,7 +306,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         step="1"
                         {...register(`openingStock.${idx}.quantity`)}
                         error={errors.openingStock?.[idx]?.quantity?.message}
-                      />
+                      >
+                        {errors.openingStock?.[idx]?.quantity?.message && (
+                          <p className="mt-1 text-xs text-rose-500 font-medium">
+                            {errors.openingStock?.[idx]?.quantity?.message}
+                          </p>
+                        )}
+                      </Input>
                     </div>
                     <button
                       type="button"
@@ -242,7 +342,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           <Button variant="outline" size="sm" type="button" onClick={onClose} disabled={isLoading}>
             Cancel
           </Button>
-          <Button variant="primary" size="sm" type="submit" isLoading={isLoading}>
+          <Button
+            variant="primary"
+            size="sm"
+            type="submit"
+            isLoading={isLoading}
+            disabled={!editingProduct && noBrandsOrCategories}
+          >
             {editingProduct ? 'Update Product' : 'Create Product'}
           </Button>
         </div>
@@ -250,4 +356,3 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     </Modal>
   );
 };
-

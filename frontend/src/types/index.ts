@@ -5,9 +5,42 @@ export interface User {
   role: 'admin';
 }
 
+export interface Brand {
+  _id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  productCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Category {
+  _id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  productCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Section {
+  _id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  areaCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Area {
   _id: string;
-  areaNumber: number;
+  name?: string;
+  sectionId?: string | Section;
+  section?: Section;
+  areaNumber?: number;
   displayName: string;
   description?: string;
   isActive: boolean;
@@ -27,8 +60,12 @@ export interface AreaBalance {
 
 export interface Product {
   _id: string;
-  code: string;
+  code?: string;
   name: string;
+  brandId?: string | Brand;
+  categoryId?: string | Category;
+  brand?: Brand;
+  category?: Category;
   details?: string;
   unit: string;
   isActive: boolean;

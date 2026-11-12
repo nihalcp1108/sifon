@@ -137,7 +137,7 @@ export const ReturnDetailPage: React.FC = () => {
           <div>
             <span className="text-slate-400 uppercase font-semibold block mb-1">Product</span>
             <span className="font-semibold text-slate-800">
-              {returnDoc.productId?.name} ({returnDoc.productId?.code})
+              {returnDoc.productId?.name}
             </span>
           </div>
           <div>

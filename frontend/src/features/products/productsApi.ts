@@ -7,6 +7,8 @@ export const productsApi = {
       page?: number;
       limit?: number;
       search?: string;
+      brandId?: string;
+      categoryId?: string;
       activeOnly?: boolean | string;
       isActive?: boolean | string;
     },
@@ -17,6 +19,12 @@ export const productsApi = {
       if (params.page !== undefined && params.page !== null) cleanParams.page = params.page;
       if (params.limit !== undefined && params.limit !== null) cleanParams.limit = params.limit;
       if (params.search && params.search.trim()) cleanParams.search = params.search.trim();
+      if (params.brandId && /^[0-9a-fA-F]{24}$/.test(params.brandId.trim())) {
+        cleanParams.brandId = params.brandId.trim();
+      }
+      if (params.categoryId && /^[0-9a-fA-F]{24}$/.test(params.categoryId.trim())) {
+        cleanParams.categoryId = params.categoryId.trim();
+      }
       if (params.activeOnly !== undefined && params.activeOnly !== null && params.activeOnly !== 'all') {
         cleanParams.activeOnly = params.activeOnly;
       }
@@ -34,6 +42,8 @@ export const productsApi = {
   getProductOptions: async (
     params?: {
       search?: string;
+      brandId?: string;
+      categoryId?: string;
       limit?: number;
       page?: number;
       activeOnly?: boolean | string;
@@ -45,6 +55,12 @@ export const productsApi = {
     const cleanParams: Record<string, any> = {};
     if (params) {
       if (params.search && params.search.trim()) cleanParams.search = params.search.trim();
+      if (params.brandId && /^[0-9a-fA-F]{24}$/.test(params.brandId.trim())) {
+        cleanParams.brandId = params.brandId.trim();
+      }
+      if (params.categoryId && /^[0-9a-fA-F]{24}$/.test(params.categoryId.trim())) {
+        cleanParams.categoryId = params.categoryId.trim();
+      }
       if (params.limit !== undefined && params.limit !== null) cleanParams.limit = params.limit;
       if (params.page !== undefined && params.page !== null) cleanParams.page = params.page;
       if (params.activeOnly !== undefined && params.activeOnly !== null) cleanParams.activeOnly = params.activeOnly;
@@ -74,8 +90,10 @@ export const productsApi = {
   },
 
   createProduct: async (data: {
-    code: string;
     name: string;
+    brandId: string;
+    categoryId: string;
+    code?: string;
     details?: string;
     unit?: string;
     openingStock?: { areaId: string; quantity: number }[];
@@ -86,10 +104,16 @@ export const productsApi = {
 
   updateProduct: async (
     id: string,
-    data: { name?: string; details?: string; unit?: string; isActive?: boolean }
+    data: {
+      name?: string;
+      brandId?: string;
+      categoryId?: string;
+      details?: string;
+      unit?: string;
+      isActive?: boolean;
+    }
   ): Promise<Product> => {
     const res = await apiClient.put<{ data: Product }>(`/products/${id}`, data);
     return res.data.data;
   },
 };
-

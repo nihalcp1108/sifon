@@ -7,17 +7,25 @@ import {
 } from '../../utils/query-validation.js';
 
 export const createProductSchema = z.object({
-  code: z
-    .string({ required_error: 'Product code/SKU is required' })
-    .trim()
-    .min(1, 'Product code cannot be empty')
-    .max(50, 'Product code must be 50 characters or less')
-    .toUpperCase(),
   name: z
     .string({ required_error: 'Product name is required' })
     .trim()
     .min(1, 'Product name cannot be empty')
     .max(200),
+  brandId: z
+    .string({ required_error: 'Brand is required' })
+    .trim()
+    .regex(/^[0-9a-fA-F]{24}$/, 'Invalid Brand ID format'),
+  categoryId: z
+    .string({ required_error: 'Category is required' })
+    .trim()
+    .regex(/^[0-9a-fA-F]{24}$/, 'Invalid Category ID format'),
+  code: z
+    .string()
+    .trim()
+    .max(50)
+    .toUpperCase()
+    .optional(),
   details: z.string().trim().max(1000).optional(),
   unit: z.string().trim().min(1).max(20).default('pcs'),
   openingStock: z
@@ -32,6 +40,16 @@ export const createProductSchema = z.object({
 
 export const updateProductSchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
+  brandId: z
+    .string()
+    .trim()
+    .regex(/^[0-9a-fA-F]{24}$/, 'Invalid Brand ID format')
+    .optional(),
+  categoryId: z
+    .string()
+    .trim()
+    .regex(/^[0-9a-fA-F]{24}$/, 'Invalid Category ID format')
+    .optional(),
   details: z.string().trim().max(1000).optional(),
   unit: z.string().trim().min(1).max(20).optional(),
   isActive: z.boolean().optional(),
@@ -43,6 +61,8 @@ export const productQuerySchema = z.object({
   search: searchQueryParam(200),
   activeOnly: booleanQueryParam,
   isActive: booleanQueryParam,
+  brandId: optionalObjectIdQueryParam,
+  categoryId: optionalObjectIdQueryParam,
 });
 
 export const productOptionsQuerySchema = z.object({
@@ -52,11 +72,11 @@ export const productOptionsQuerySchema = z.object({
   activeOnly: booleanQueryParam,
   isActive: booleanQueryParam,
   selectedId: optionalObjectIdQueryParam,
+  brandId: optionalObjectIdQueryParam,
+  categoryId: optionalObjectIdQueryParam,
 });
 
 export type CreateProductInput = z.infer<typeof createProductSchema>;
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;
 export type ProductQueryInput = z.infer<typeof productQuerySchema>;
 export type ProductOptionsQueryInput = z.infer<typeof productOptionsQuerySchema>;
-
-

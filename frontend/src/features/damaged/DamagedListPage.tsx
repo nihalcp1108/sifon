@@ -86,21 +86,19 @@ export const DamagedListPage: React.FC = () => {
           <div className="flex gap-2">
             <button
               onClick={() => setActiveTab('balances')}
-              className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${
-                activeTab === 'balances'
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'balances'
                   ? 'bg-navy-900 text-white shadow-xs'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
+                }`}
             >
               Current Damaged Balances
             </button>
             <button
               onClick={() => setActiveTab('history')}
-              className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${
-                activeTab === 'history'
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'history'
                   ? 'bg-navy-900 text-white shadow-xs'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
+                }`}
             >
               Supporting Return History
             </button>
@@ -131,7 +129,7 @@ export const DamagedListPage: React.FC = () => {
               <option value="">All Products</option>
               {products.map(p => (
                 <option key={p._id} value={p._id}>
-                  {p.name} ({p.code})
+                  {p.name}
                 </option>
               ))}
             </select>
@@ -223,7 +221,6 @@ export const DamagedListPage: React.FC = () => {
               <table className="w-full text-left border-collapse text-sm">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                    <th className="py-3.5 px-6">SKU / Code</th>
                     <th className="py-3.5 px-6">Product Name</th>
                     <th className="py-3.5 px-6">Storage Area</th>
                     <th className="py-3.5 px-6 text-right">Damaged Quantity</th>
@@ -232,9 +229,6 @@ export const DamagedListPage: React.FC = () => {
                 <tbody className="divide-y divide-slate-100">
                   {balances.map(b => (
                     <tr key={b._id} className="hover:bg-slate-50/70">
-                      <td className="py-3.5 px-6 font-mono font-bold text-navy-950">
-                        {b.productId?.code}
-                      </td>
                       <td className="py-3.5 px-6 font-medium text-slate-900">
                         {b.productId?.name}
                       </td>
@@ -289,7 +283,7 @@ export const DamagedListPage: React.FC = () => {
                         {r.saleId?.reference || '-'}
                       </td>
                       <td className="py-3.5 px-6 font-medium text-slate-900">
-                        {r.productId?.name} ({r.productId?.code})
+                        {r.productId?.name}
                       </td>
                       <td className="py-3.5 px-6 font-semibold text-navy-900">
                         {r.receivingAreaId?.displayName}

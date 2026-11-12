@@ -10,6 +10,9 @@ import { apiRateLimiter } from './middleware/rateLimiter.js';
 // Routers
 import authRouter from './modules/auth/auth.router.js';
 import dashboardRouter from './modules/dashboard/dashboard.router.js';
+import brandsRouter from './modules/brands/brand.router.js';
+import categoriesRouter from './modules/categories/category.router.js';
+import sectionsRouter from './modules/sections/section.router.js';
 import productsRouter from './modules/products/product.router.js';
 import areasRouter from './modules/areas/area.router.js';
 import purchasesRouter from './modules/purchases/purchase.router.js';
@@ -99,6 +102,9 @@ export function createApp(): express.Application {
   const apiV1 = express.Router();
   apiV1.use('/auth', authRouter);
   apiV1.use('/dashboard', dashboardRouter);
+  apiV1.use('/brands', brandsRouter);
+  apiV1.use('/categories', categoriesRouter);
+  apiV1.use('/sections', sectionsRouter);
   apiV1.use('/products', productsRouter);
   apiV1.use('/areas', areasRouter);
   apiV1.use('/purchases', purchasesRouter);

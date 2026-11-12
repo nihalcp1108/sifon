@@ -198,7 +198,7 @@ export const SaleCreatePage: React.FC = () => {
     try {
       const created = await productsApi.createProduct(prodData);
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success(`Product ${created.name} (${created.code}) created successfully.`);
+      toast.success(`Product "${created.name}" created successfully.`);
       setIsProductModalOpen(false);
     } catch (err: any) {
       toast.error(err.message || 'Failed to create product');
@@ -374,8 +374,8 @@ export const SaleCreatePage: React.FC = () => {
                             {isAreasLoading
                               ? '-- Loading areas... --'
                               : activeAreas.length === 0
-                              ? '-- No active areas --'
-                              : '-- Select Source Area --'}
+                                ? '-- No active areas --'
+                                : '-- Select Source Area --'}
                           </option>
                           {activeAreas.map(a => (
                             <option key={a._id} value={a._id}>
@@ -417,9 +417,8 @@ export const SaleCreatePage: React.FC = () => {
                             <>
                               Stock in {selectedArea?.displayName || 'selected area'}:{' '}
                               <strong
-                                className={`font-mono font-bold ${
-                                  availStock > 0 ? 'text-emerald-700' : 'text-rose-600'
-                                }`}
+                                className={`font-mono font-bold ${availStock > 0 ? 'text-emerald-700' : 'text-rose-600'
+                                  }`}
                               >
                                 {availStock.toLocaleString()} {selectedProd?.unit || 'pcs'}
                               </strong>

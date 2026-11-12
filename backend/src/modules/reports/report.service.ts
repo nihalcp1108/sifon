@@ -7,6 +7,15 @@ import { MatrixStatementQueryInput, PeriodStatementQueryInput } from './report.v
 import { parseDateStartInclusive, parseDateEndExclusive } from '../../utils/date.js';
 import { arrayToCsv } from '../../utils/csv.js';
 
+function formatAreaDisplayName(area: any): string {
+  if (area.sectionId && typeof area.sectionId === 'object' && area.sectionId.name && area.name) {
+    return `${area.sectionId.name} — ${area.name}`;
+  }
+  if (area.name) return area.name;
+  if (area.areaNumber) return `Area ${area.areaNumber}`;
+  return 'Unnamed Area';
+}
+
 export class ReportService {
   /**
    * View A: Current Area-Wise Stock Matrix
@@ -26,9 +35,17 @@ export class ReportService {
       areaFilter._id = new mongoose.Types.ObjectId(query.areaId);
     }
 
-    // Get all numbered areas sorted strictly numerically (1, 2, 3, 10...)
-    const areas = await Area.find(areaFilter).sort({ areaNumber: 1 }).lean();
-    const products = await Product.find(productFilter).sort({ name: 1, code: 1 }).lean();
+    // Get all areas populated with section
+    const areas = await Area.find(areaFilter)
+      .populate('sectionId', 'name')
+      .sort({ areaNumber: 1, name: 1 })
+      .lean();
+
+    const products = await Product.find(productFilter)
+      .populate('brandId', 'name')
+      .populate('categoryId', 'name')
+      .sort({ name: 1 })
+      .lean();
 
     const productIds = products.map(p => p._id);
     const areaIds = areas.map(a => a._id);
@@ -67,10 +84,11 @@ export class ReportService {
       return {
         product: {
           _id: product._id,
-          code: product.code,
           name: product.name,
           unit: product.unit,
           isActive: product.isActive,
+          brand: (product as any).brandId ? { _id: (product as any).brandId._id, name: (product as any).brandId.name } : undefined,
+          category: (product as any).categoryId ? { _id: (product as any).categoryId._id, name: (product as any).categoryId.name } : undefined,
         },
         areaQuantities,
         totalAvailable,
@@ -82,7 +100,9 @@ export class ReportService {
       areas: areas.map(a => ({
         _id: a._id,
         areaNumber: a.areaNumber,
-        displayName: `Area ${a.areaNumber}`,
+        name: a.name,
+        section: (a as any).sectionId ? { _id: (a as any).sectionId._id, name: (a as any).sectionId.name } : undefined,
+        displayName: formatAreaDisplayName(a),
         description: a.description,
         isActive: a.isActive,
       })),
@@ -97,7 +117,8 @@ export class ReportService {
     const data = await this.getCurrentStockMatrix(query);
 
     const headers = [
-      'Product Code',
+      'Brand',
+      'Category',
       'Product Name',
       'Unit',
       'Status',
@@ -112,7 +133,8 @@ export class ReportService {
       const damagedByArea = data.areas.map(a => row.areaQuantities[a._id.toString()]?.damaged || 0);
 
       return [
-        row.product.code,
+        row.product.brand?.name || '—',
+        row.product.category?.name || '—',
         row.product.name,
         row.product.unit,
         row.product.isActive ? 'Active' : 'Archived',
@@ -147,8 +169,15 @@ export class ReportService {
       areaFilter._id = new mongoose.Types.ObjectId(query.areaId);
     }
 
-    const areas = await Area.find(areaFilter).sort({ areaNumber: 1 }).lean();
-    const products = await Product.find(productFilter).sort({ name: 1, code: 1 }).lean();
+    const areas = await Area.find(areaFilter)
+      .populate('sectionId', 'name')
+      .sort({ areaNumber: 1, name: 1 })
+      .lean();
+    const products = await Product.find(productFilter)
+      .populate('brandId', 'name')
+      .populate('categoryId', 'name')
+      .sort({ name: 1 })
+      .lean();
 
     const productIds = products.map(p => p._id);
     const areaIds = areas.map(a => a._id);
@@ -272,15 +301,18 @@ export class ReportService {
           statementRows.push({
             product: {
               _id: product._id,
-              code: product.code,
               name: product.name,
               unit: product.unit,
               isActive: product.isActive,
+              brand: (product as any).brandId ? { _id: (product as any).brandId._id, name: (product as any).brandId.name } : undefined,
+              category: (product as any).categoryId ? { _id: (product as any).categoryId._id, name: (product as any).categoryId.name } : undefined,
             },
             area: {
               _id: area._id,
               areaNumber: area.areaNumber,
-              displayName: `Area ${area.areaNumber}`,
+              name: area.name,
+              section: (area as any).sectionId ? { _id: (area as any).sectionId._id, name: (area as any).sectionId.name } : undefined,
+              displayName: formatAreaDisplayName(area),
             },
             openingAvailable: opening.available,
             openingStockAdded,
@@ -319,7 +351,8 @@ export class ReportService {
     const data = await this.getPeriodMovementStatement(query);
 
     const headers = [
-      'Product Code',
+      'Brand',
+      'Category',
       'Product Name',
       'Area',
       'Opening Available',
@@ -336,7 +369,8 @@ export class ReportService {
     ];
 
     const rows = data.rows.map(row => [
-      row.product.code,
+      row.product.brand?.name || '—',
+      row.product.category?.name || '—',
       row.product.name,
       row.area.displayName,
       row.openingAvailable,

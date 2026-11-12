@@ -201,7 +201,7 @@ export const StockStatementPage: React.FC = () => {
               <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search SKU or name..."
+                placeholder="Search product name..."
                 value={matrixSearch}
                 onChange={e => setMatrixSearch(e.target.value)}
                 className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg"
@@ -218,7 +218,7 @@ export const StockStatementPage: React.FC = () => {
                 <option value="">All Products</option>
                 {products.map(p => (
                   <option key={p._id} value={p._id}>
-                    {p.name} ({p.code})
+                    {p.name}
                   </option>
                 ))}
               </select>
@@ -290,7 +290,7 @@ export const StockStatementPage: React.FC = () => {
                 <option value="">All Products</option>
                 {products.map(p => (
                   <option key={p._id} value={p._id}>
-                    {p.name} ({p.code})
+                    {p.name}
                   </option>
                 ))}
               </select>

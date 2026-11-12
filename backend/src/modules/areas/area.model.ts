@@ -2,24 +2,31 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IArea extends Document {
   _id: mongoose.Types.ObjectId;
-  areaNumber: number;
+  name?: string;
+  sectionId?: mongoose.Types.ObjectId | any;
+  areaNumber?: number;
   description?: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  displayName?: string;
 }
 
 const AreaSchema = new Schema<IArea>(
   {
+    name: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+    sectionId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Section',
+      index: true,
+    },
     areaNumber: {
       type: Number,
-      required: true,
-      unique: true,
-      min: [1, 'Area number must be a positive integer'],
-      validate: {
-        validator: Number.isInteger,
-        message: '{VALUE} is not an integer value',
-      },
+      sparse: true,
       index: true,
     },
     description: {
@@ -29,6 +36,7 @@ const AreaSchema = new Schema<IArea>(
     isActive: {
       type: Boolean,
       default: true,
+      index: true,
     },
   },
   {
@@ -38,9 +46,12 @@ const AreaSchema = new Schema<IArea>(
   }
 );
 
-AreaSchema.virtual('displayName').get(function (this: IArea) {
-  return `Area ${this.areaNumber}`;
+AreaSchema.virtual('displayName').get(function (this: any) {
+  const areaName = this.name || (this.areaNumber ? `Area ${this.areaNumber}` : 'Unnamed Area');
+  if (this.sectionId && typeof this.sectionId === 'object' && this.sectionId.name) {
+    return `${this.sectionId.name} — ${areaName}`;
+  }
+  return areaName;
 });
 
 export const Area = mongoose.model<IArea>('Area', AreaSchema);
-

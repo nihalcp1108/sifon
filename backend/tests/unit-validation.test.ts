@@ -237,5 +237,72 @@ describe('Unit Validation Tests', () => {
     expect(() => optionalObjectIdQueryParam.parse('invalid-id')).toThrow(/Invalid ID format for _id/);
     expect(() => optionalObjectIdQueryParam.parse('[object Object]')).toThrow(/Invalid ID format for _id/);
   });
+
+  it('Brand, Category, and Section creation schemas require non-empty names and trim whitespace', async () => {
+    const { createBrandSchema } = await import('../src/modules/brands/brand.validation.js');
+    const { createCategorySchema } = await import('../src/modules/categories/category.validation.js');
+    const { createSectionSchema } = await import('../src/modules/sections/section.validation.js');
+
+    expect(createBrandSchema.parse({ name: '  Nike  ' })).toEqual({ name: 'Nike' });
+    expect(() => createBrandSchema.parse({ name: '' })).toThrow();
+    expect(() => createBrandSchema.parse({})).toThrow();
+
+    expect(createCategorySchema.parse({ name: '  Footwear  ' })).toEqual({ name: 'Footwear' });
+    expect(() => createCategorySchema.parse({ name: '' })).toThrow();
+    expect(() => createCategorySchema.parse({})).toThrow();
+
+    expect(createSectionSchema.parse({ name: '  Ground Floor  ' })).toEqual({ name: 'Ground Floor' });
+    expect(() => createSectionSchema.parse({ name: '' })).toThrow();
+    expect(() => createSectionSchema.parse({})).toThrow();
+  });
+
+  it('Area creation schema requires name and valid sectionId', async () => {
+    const { createAreaSchema } = await import('../src/modules/areas/area.validation.js');
+    const validSectionId = '507f1f77bcf86cd799439011';
+
+    const validArea = createAreaSchema.parse({
+      name: '  Main Store  ',
+      sectionId: validSectionId,
+    });
+    expect(validArea.name).toBe('Main Store');
+    expect(validArea.sectionId).toBe(validSectionId);
+
+    // Missing sectionId or invalid sectionId throws
+    expect(() => createAreaSchema.parse({ name: 'Main Store' })).toThrow();
+    expect(() => createAreaSchema.parse({ name: 'Main Store', sectionId: '123' })).toThrow();
+    expect(() => createAreaSchema.parse({ sectionId: validSectionId })).toThrow();
+  });
+
+  it('Product creation schema requires brandId and categoryId, but does NOT require code', async () => {
+    const { createProductSchema } = await import('../src/modules/products/product.validation.js');
+    const brandId = '507f1f77bcf86cd799439011';
+    const categoryId = '507f1f77bcf86cd799439022';
+
+    const validProduct = createProductSchema.parse({
+      name: 'Running Shoes',
+      brandId,
+      categoryId,
+      unit: 'pairs',
+    });
+    expect(validProduct.name).toBe('Running Shoes');
+    expect(validProduct.brandId).toBe(brandId);
+    expect(validProduct.categoryId).toBe(categoryId);
+    expect(validProduct.code).toBeUndefined();
+
+    // Missing brandId or categoryId throws
+    expect(() =>
+      createProductSchema.parse({
+        name: 'Running Shoes',
+        categoryId,
+      })
+    ).toThrow();
+
+    expect(() =>
+      createProductSchema.parse({
+        name: 'Running Shoes',
+        brandId,
+      })
+    ).toThrow();
+  });
 });
 

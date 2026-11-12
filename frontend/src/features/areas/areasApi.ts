@@ -8,6 +8,8 @@ export const areasApi = {
       limit?: number;
       activeOnly?: boolean | string;
       isActive?: boolean | string;
+      search?: string;
+      sectionId?: string;
     },
     signal?: AbortSignal
   ) => {
@@ -15,6 +17,10 @@ export const areasApi = {
     if (params) {
       if (params.page !== undefined && params.page !== null) cleanParams.page = params.page;
       if (params.limit !== undefined && params.limit !== null) cleanParams.limit = params.limit;
+      if (params.search && params.search.trim()) cleanParams.search = params.search.trim();
+      if (params.sectionId && /^[0-9a-fA-F]{24}$/.test(params.sectionId.trim())) {
+        cleanParams.sectionId = params.sectionId.trim();
+      }
       if (params.activeOnly !== undefined && params.activeOnly !== null && params.activeOnly !== 'all') {
         cleanParams.activeOnly = params.activeOnly;
       }
@@ -36,6 +42,8 @@ export const areasApi = {
       activeOnly?: boolean | string;
       isActive?: boolean | string;
       selectedId?: string;
+      search?: string;
+      sectionId?: string;
     },
     signal?: AbortSignal
   ) => {
@@ -43,6 +51,10 @@ export const areasApi = {
     if (params) {
       if (params.limit !== undefined && params.limit !== null) cleanParams.limit = params.limit;
       if (params.page !== undefined && params.page !== null) cleanParams.page = params.page;
+      if (params.search && params.search.trim()) cleanParams.search = params.search.trim();
+      if (params.sectionId && /^[0-9a-fA-F]{24}$/.test(params.sectionId.trim())) {
+        cleanParams.sectionId = params.sectionId.trim();
+      }
       if (params.activeOnly !== undefined && params.activeOnly !== null) cleanParams.activeOnly = params.activeOnly;
       if (params.isActive !== undefined && params.isActive !== null) cleanParams.isActive = params.isActive;
       if (params.selectedId && /^[0-9a-fA-F]{24}$/.test(params.selectedId.trim())) {
@@ -61,12 +73,20 @@ export const areasApi = {
     return res.data.data;
   },
 
-  createArea: async (data: { areaNumber: number; description?: string }): Promise<Area> => {
+  createArea: async (data: {
+    name: string;
+    sectionId: string;
+    description?: string;
+    areaNumber?: number;
+  }): Promise<Area> => {
     const res = await apiClient.post<{ data: Area }>('/areas', data);
     return res.data.data;
   },
 
-  updateArea: async (id: string, data: { description?: string; isActive?: boolean }): Promise<Area> => {
+  updateArea: async (
+    id: string,
+    data: { name?: string; sectionId?: string; description?: string; isActive?: boolean }
+  ): Promise<Area> => {
     const res = await apiClient.put<{ data: Area }>(`/areas/${id}`, data);
     return res.data.data;
   },
@@ -75,4 +95,3 @@ export const areasApi = {
     await apiClient.delete(`/areas/${id}`);
   },
 };
-

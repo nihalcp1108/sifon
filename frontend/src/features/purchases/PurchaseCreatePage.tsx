@@ -159,7 +159,7 @@ export const PurchaseCreatePage: React.FC = () => {
     try {
       const created = await productsApi.createProduct(prodData);
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success(`Product ${created.name} (${created.code}) created successfully.`);
+      toast.success(`Product "${created.name}" created successfully.`);
       setIsProductModalOpen(false);
     } catch (err: any) {
       toast.error(err.message || 'Failed to create product');

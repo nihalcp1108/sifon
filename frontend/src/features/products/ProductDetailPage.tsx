@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Package, Boxes, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { ArrowLeft, Package, Boxes, AlertTriangle, CheckCircle, Clock, Tag, Layers } from 'lucide-react';
 import { productsApi } from './productsApi';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/common/Button';
@@ -54,6 +54,16 @@ export const ProductDetailPage: React.FC = () => {
   const movements = movementsData?.data || [];
   const meta = movementsData?.meta;
 
+  const brandName =
+    typeof product.brandId === 'object' && (product.brandId as any)?.name
+      ? (product.brandId as any).name
+      : product.brand?.name || '—';
+
+  const categoryName =
+    typeof product.categoryId === 'object' && (product.categoryId as any)?.name
+      ? (product.categoryId as any).name
+      : product.category?.name || '—';
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -68,12 +78,22 @@ export const ProductDetailPage: React.FC = () => {
       </div>
 
       <PageHeader
-        title={`${product.name} (${product.code})`}
+        title={product.name}
         subtitle={product.details || 'Product balance details and ledger movement audit trail'}
         action={
-          <Badge variant={product.isActive ? 'active' : 'archived'}>
-            {product.isActive ? 'Active Catalog' : 'Archived Catalog'}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200">
+              <Tag className="w-3.5 h-3.5 text-slate-500" />
+              Brand: {brandName}
+            </span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200">
+              <Layers className="w-3.5 h-3.5 text-teal-600" />
+              Category: {categoryName}
+            </span>
+            <Badge variant={product.isActive ? 'active' : 'archived'}>
+              {product.isActive ? 'Active Catalog' : 'Archived Catalog'}
+            </Badge>
+          </div>
         }
       />
 
@@ -144,7 +164,7 @@ export const ProductDetailPage: React.FC = () => {
           </p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {product.balances.map(b => (
+            {product.balances.map((b) => (
               <div
                 key={b._id}
                 className="p-3.5 rounded-lg border border-slate-200/80 bg-slate-50/50 flex flex-col justify-between"
@@ -208,7 +228,7 @@ export const ProductDetailPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
-                {movements.map(m => (
+                {movements.map((m) => (
                   <tr key={m._id} className="hover:bg-slate-50/70">
                     <td className="py-3 px-6 font-mono text-slate-600">
                       {formatDate(m.businessDate)}

@@ -2,27 +2,31 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
-  Package,
+  Tag,
   Layers,
-  ShoppingBag,
+  Boxes,
+  Package,
   Truck,
+  ShoppingBag,
   RotateCcw,
   AlertTriangle,
   FileSpreadsheet,
-  Boxes,
-  X,
   Settings,
+  X,
+  Warehouse,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 const navItems = [
   { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
-  { label: 'Products', to: '/products', icon: Package },
-  { label: 'Areas', to: '/areas', icon: Boxes },
-  { label: 'Purchases', to: '/purchases', icon: Truck },
+  { label: 'Brand', to: '/brands', icon: Tag },
+  { label: 'Category', to: '/categories', icon: Layers },
+  { label: 'Area', to: '/areas', icon: Boxes },
+  { label: 'Product', to: '/products', icon: Package },
+  { label: 'Purchase', to: '/purchases', icon: Truck },
   { label: 'Sales', to: '/sales', icon: ShoppingBag },
-  { label: 'Returns', to: '/returns', icon: RotateCcw },
-  { label: 'Damaged Products', to: '/damaged', icon: AlertTriangle },
+  { label: 'Return', to: '/returns', icon: RotateCcw },
+  { label: 'Damage', to: '/damaged', icon: AlertTriangle },
   { label: 'Stock Statement', to: '/statement', icon: FileSpreadsheet },
   { label: 'Account Settings', to: '/settings', icon: Settings },
 ];
@@ -52,7 +56,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
         <div className="h-16 flex items-center justify-between px-6 border-b border-navy-900/80 bg-navy-900/40">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-navy-800 border border-teal-500/30 flex items-center justify-center text-teal-400 shadow-xs">
-              <Layers className="w-5 h-5" />
+              <Warehouse className="w-5 h-5" />
             </div>
             <div>
               <span className="text-xl font-bold tracking-tight text-white">Sifon</span>
@@ -71,7 +75,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
 
         {/* Navigation items */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navItems.map(item => {
+          {navItems.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink
@@ -103,16 +107,12 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
           })}
         </nav>
 
-        {/* Bottom footer status */}
-        <div className="p-4 border-t border-navy-900/80 bg-navy-900/30 text-xs text-slate-400">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
-            <span className="text-slate-300 font-medium">System Online</span>
-          </div>
-          <p className="text-[11px] text-slate-400">Business TZ: Asia/Kolkata</p>
+        {/* Footer info */}
+        <div className="p-4 border-t border-navy-900/80 text-xs text-slate-400">
+          <p className="font-semibold text-slate-300">Sifon Stock Engine</p>
+          <p className="text-[11px] text-slate-400">Double-entry audit verification</p>
         </div>
       </aside>
     </>
   );
 };
-

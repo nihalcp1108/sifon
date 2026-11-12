@@ -3,9 +3,11 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppLayout } from '../components/layout/AppLayout';
 import { LoginPage } from '../features/auth/LoginPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
+import { BrandsListPage } from '../features/brands/BrandsListPage';
+import { CategoriesListPage } from '../features/categories/CategoriesListPage';
+import { AreasListPage } from '../features/areas/AreasListPage';
 import { ProductsListPage } from '../features/products/ProductsListPage';
 import { ProductDetailPage } from '../features/products/ProductDetailPage';
-import { AreasListPage } from '../features/areas/AreasListPage';
 import { PurchasesListPage } from '../features/purchases/PurchasesListPage';
 import { PurchaseCreatePage } from '../features/purchases/PurchaseCreatePage';
 import { PurchaseDetailPage } from '../features/purchases/PurchaseDetailPage';
@@ -28,36 +30,42 @@ export const AppRoutes: React.FC = () => {
       <Route element={<AppLayout />}>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
-        
-        {/* Products */}
+
+        {/* 1. Brands */}
+        <Route path="/brands" element={<BrandsListPage />} />
+
+        {/* 2. Categories */}
+        <Route path="/categories" element={<CategoriesListPage />} />
+
+        {/* 3. Areas */}
+        <Route path="/areas" element={<AreasListPage />} />
+
+        {/* 4. Products */}
         <Route path="/products" element={<ProductsListPage />} />
         <Route path="/products/:id" element={<ProductDetailPage />} />
 
-        {/* Numbered Areas */}
-        <Route path="/areas" element={<AreasListPage />} />
-
-        {/* Purchases */}
+        {/* 5. Purchases */}
         <Route path="/purchases" element={<PurchasesListPage />} />
         <Route path="/purchases/new" element={<PurchaseCreatePage />} />
         <Route path="/purchases/:id" element={<PurchaseDetailPage />} />
 
-        {/* Sales */}
+        {/* 6. Sales */}
         <Route path="/sales" element={<SalesListPage />} />
         <Route path="/sales/new" element={<SaleCreatePage />} />
         <Route path="/sales/:id" element={<SaleDetailPage />} />
 
-        {/* Returns */}
+        {/* 7. Returns */}
         <Route path="/returns" element={<ReturnsListPage />} />
         <Route path="/returns/new" element={<ReturnCreatePage />} />
         <Route path="/returns/:id" element={<ReturnDetailPage />} />
 
-        {/* Damaged */}
+        {/* 8. Damaged */}
         <Route path="/damaged" element={<DamagedListPage />} />
 
-        {/* Stock Statement */}
+        {/* 9. Stock Statement */}
         <Route path="/statement" element={<StockStatementPage />} />
 
-        {/* Admin Account Settings */}
+        {/* 10. Admin Account Settings */}
         <Route path="/settings" element={<AccountSettingsPage />} />
       </Route>
 
@@ -66,4 +74,3 @@ export const AppRoutes: React.FC = () => {
     </Routes>
   );
 };
-

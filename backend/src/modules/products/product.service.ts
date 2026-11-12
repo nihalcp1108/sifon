@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import { Product, IProduct } from './product.model.js';
 import { Area } from '../areas/area.model.js';
+import { Brand } from '../brands/brand.model.js';
+import { Category } from '../categories/category.model.js';
 import { InventoryMovement } from '../inventory/inventory-movement.model.js';
 import { InventoryBalance } from '../inventory/inventory-balance.model.js';
 import { InventoryService } from '../inventory/inventory.service.js';
@@ -15,12 +17,38 @@ import { runInTransaction } from '../../utils/transactions.js';
 
 export class ProductService {
   static async createProduct(input: CreateProductInput, userId: string): Promise<IProduct> {
-    const existing = await Product.findOne({ code: input.code.toUpperCase() });
-    if (existing) {
-      throw new ConflictError(`Product with code ${input.code} already exists`);
+    // 1. Validate Brand exists and is active
+    if (!mongoose.Types.ObjectId.isValid(input.brandId)) {
+      throw new ValidationError('Invalid Brand ID');
+    }
+    const brand = await Brand.findById(input.brandId);
+    if (!brand) {
+      throw new NotFoundError(`Brand not found: ${input.brandId}`);
     }
 
-    // If opening stock is specified, validate areas exist and are active
+    // 2. Validate Category exists and is active
+    if (!mongoose.Types.ObjectId.isValid(input.categoryId)) {
+      throw new ValidationError('Invalid Category ID');
+    }
+    const category = await Category.findById(input.categoryId);
+    if (!category) {
+      throw new NotFoundError(`Category not found: ${input.categoryId}`);
+    }
+
+    // 3. Handle Product Code:
+    // If not provided by the user, generate an internal unique code to maintain backwards compatibility
+    // with MongoDB Atlas indexes that might not be sparse
+    let productCode = input.code?.trim().toUpperCase();
+    if (productCode) {
+      const existing = await Product.findOne({ code: productCode });
+      if (existing) {
+        throw new ConflictError(`Product with code ${productCode} already exists`);
+      }
+    } else {
+      productCode = `PRD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    }
+
+    // 4. If opening stock is specified, validate areas exist and are active
     if (input.openingStock && input.openingStock.length > 0) {
       const areaIds = input.openingStock.map(o => o.areaId);
       const uniqueAreaIds = new Set(areaIds);
@@ -40,9 +68,11 @@ export class ProductService {
       const [product] = await Product.create(
         [
           {
-            code: input.code.toUpperCase(),
-            name: input.name,
-            details: input.details,
+            name: input.name.trim(),
+            brandId: brand._id,
+            categoryId: category._id,
+            code: productCode,
+            details: input.details?.trim(),
             unit: input.unit || 'pcs',
             isActive: true,
           },
@@ -69,7 +99,7 @@ export class ProductService {
         }
       }
 
-      return product;
+      return await product.populate(['brandId', 'categoryId']);
     });
   }
 
@@ -83,9 +113,18 @@ export class ProductService {
       filter.isActive = false;
     }
 
+    if (query.brandId && mongoose.Types.ObjectId.isValid(query.brandId)) {
+      filter.brandId = new mongoose.Types.ObjectId(query.brandId);
+    }
+
+    if (query.categoryId && mongoose.Types.ObjectId.isValid(query.categoryId)) {
+      filter.categoryId = new mongoose.Types.ObjectId(query.categoryId);
+    }
+
     if (query.search) {
-      const searchRegex = new RegExp(query.search.trim(), 'i');
-      filter.$or = [{ name: searchRegex }, { code: searchRegex }];
+      const escaped = query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = new RegExp(escaped, 'i');
+      filter.$or = [{ name: searchRegex }, { details: searchRegex }, { code: searchRegex }];
     }
 
     const total = await Product.countDocuments(filter);
@@ -93,6 +132,8 @@ export class ProductService {
     const limit = query.limit || 20;
 
     const products = await Product.find(filter)
+      .populate('brandId', 'name description isActive')
+      .populate('categoryId', 'name description isActive')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
@@ -121,7 +162,11 @@ export class ProductService {
 
     const productIds = products.map(p => p._id);
     const allBalances = await InventoryBalance.find({ productId: { $in: productIds } })
-      .populate('areaId', 'areaNumber description isActive')
+      .populate({
+        path: 'areaId',
+        select: 'name areaNumber description isActive sectionId',
+        populate: { path: 'sectionId', select: 'name' },
+      })
       .lean();
 
     const balancesByProduct = new Map<string, any[]>();
@@ -137,9 +182,9 @@ export class ProductService {
       const pIdStr = product._id.toString();
       const pBalances = (balancesByProduct.get(pIdStr) || []).slice();
       pBalances.sort((a: any, b: any) => {
-        const numA = a.areaId?.areaNumber ?? 999999;
-        const numB = b.areaId?.areaNumber ?? 999999;
-        return numA - numB;
+        const nameA = a.areaId?.name || (a.areaId?.areaNumber ? `Area ${a.areaId.areaNumber}` : '');
+        const nameB = b.areaId?.name || (b.areaId?.areaNumber ? `Area ${b.areaId.areaNumber}` : '');
+        return nameA.localeCompare(nameB);
       });
       const totalAvailable = pBalances.reduce((sum: number, b: any) => sum + (b.availableQuantity || 0), 0);
       const totalDamaged = pBalances.reduce((sum: number, b: any) => sum + (b.damagedQuantity || 0), 0);
@@ -148,6 +193,10 @@ export class ProductService {
         _id: product._id,
         code: product.code,
         name: product.name,
+        brandId: product.brandId,
+        brand: product.brandId,
+        categoryId: product.categoryId,
+        category: product.categoryId,
         details: product.details,
         unit: product.unit || 'pcs',
         isActive: product.isActive,
@@ -165,12 +214,20 @@ export class ProductService {
     if (activeFilter === false) {
       filter.isActive = false;
     } else {
-      // By default for selector options, return active products
       filter.isActive = { $ne: false };
     }
 
+    if (query.brandId && mongoose.Types.ObjectId.isValid(query.brandId)) {
+      filter.brandId = new mongoose.Types.ObjectId(query.brandId);
+    }
+
+    if (query.categoryId && mongoose.Types.ObjectId.isValid(query.categoryId)) {
+      filter.categoryId = new mongoose.Types.ObjectId(query.categoryId);
+    }
+
     if (query.search) {
-      const searchRegex = new RegExp(query.search.trim(), 'i');
+      const escaped = query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = new RegExp(escaped, 'i');
       filter.$or = [{ name: searchRegex }, { code: searchRegex }];
     }
 
@@ -179,11 +236,16 @@ export class ProductService {
 
     let selectedProduct: any = null;
     if (query.selectedId && mongoose.Types.ObjectId.isValid(query.selectedId)) {
-      selectedProduct = await Product.findById(query.selectedId).lean();
+      selectedProduct = await Product.findById(query.selectedId)
+        .populate('brandId', 'name')
+        .populate('categoryId', 'name')
+        .lean();
     }
 
     const total = await Product.countDocuments(filter);
     const products = await Product.find(filter)
+      .populate('brandId', 'name')
+      .populate('categoryId', 'name')
       .sort({ name: 1 })
       .skip((page - 1) * limit)
       .limit(limit)
@@ -212,7 +274,10 @@ export class ProductService {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new ValidationError('Invalid ID format for _id');
     }
-    const product = await Product.findById(id).lean();
+    const product = await Product.findById(id)
+      .populate('brandId', 'name description isActive')
+      .populate('categoryId', 'name description isActive')
+      .lean();
     if (!product) {
       throw new NotFoundError('Product not found');
     }
@@ -221,6 +286,8 @@ export class ProductService {
 
     return {
       ...product,
+      brand: product.brandId,
+      category: product.categoryId,
       totalAvailable: balances.totalAvailable,
       totalDamaged: balances.totalDamaged,
       balances: balances.balances,
@@ -240,15 +307,29 @@ export class ProductService {
     const total = await InventoryMovement.countDocuments(filter);
 
     const movements = await InventoryMovement.find(filter)
-      .populate('areaId', 'areaNumber description')
+      .populate({
+        path: 'areaId',
+        select: 'name areaNumber description sectionId',
+        populate: { path: 'sectionId', select: 'name' },
+      })
       .populate('createdBy', 'name email')
       .sort({ businessDate: -1, createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
       .lean();
 
+    const enrichedMovements = movements.map(m => {
+      const sectionName = (m.areaId as any)?.sectionId?.name;
+      const areaName = (m.areaId as any)?.name || ((m.areaId as any)?.areaNumber ? `Area ${(m.areaId as any).areaNumber}` : 'Area');
+      const areaDisplayName = sectionName ? `${sectionName} — ${areaName}` : areaName;
+      return {
+        ...m,
+        areaDisplayName,
+      };
+    });
+
     return {
-      movements,
+      movements: enrichedMovements,
       meta: {
         page,
         limit,
@@ -267,13 +348,42 @@ export class ProductService {
       throw new NotFoundError('Product not found');
     }
 
-    if (input.name !== undefined) product.name = input.name;
-    if (input.details !== undefined) product.details = input.details;
-    if (input.unit !== undefined) product.unit = input.unit;
+    if (input.brandId !== undefined) {
+      if (input.brandId) {
+        if (!mongoose.Types.ObjectId.isValid(input.brandId)) {
+          throw new ValidationError('Invalid Brand ID');
+        }
+        const brand = await Brand.findById(input.brandId);
+        if (!brand) {
+          throw new NotFoundError(`Brand not found: ${input.brandId}`);
+        }
+        product.brandId = brand._id;
+      } else {
+        product.brandId = undefined;
+      }
+    }
+
+    if (input.categoryId !== undefined) {
+      if (input.categoryId) {
+        if (!mongoose.Types.ObjectId.isValid(input.categoryId)) {
+          throw new ValidationError('Invalid Category ID');
+        }
+        const category = await Category.findById(input.categoryId);
+        if (!category) {
+          throw new NotFoundError(`Category not found: ${input.categoryId}`);
+        }
+        product.categoryId = category._id;
+      } else {
+        product.categoryId = undefined;
+      }
+    }
+
+    if (input.name !== undefined) product.name = input.name.trim();
+    if (input.details !== undefined) product.details = input.details.trim();
+    if (input.unit !== undefined) product.unit = input.unit.trim();
     if (input.isActive !== undefined) product.isActive = input.isActive;
 
     await product.save();
-    return product;
+    return await product.populate(['brandId', 'categoryId']);
   }
 }
-

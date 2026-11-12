@@ -41,7 +41,7 @@ export const AreaMatrixView: React.FC<{ data: MatrixStatementData }> = ({ data }
         <thead>
           <tr className="bg-navy-950 text-white uppercase text-[11px] font-bold">
             <th className="py-3 px-4 sticky left-0 bg-navy-950 z-20 border-r border-navy-800">
-              Product SKU / Name
+              Product Name
             </th>
             <th className="py-3 px-3 text-center border-r border-navy-800">Unit</th>
             <th className="py-3 px-3 text-center border-r border-navy-800">Status</th>
@@ -68,10 +68,12 @@ export const AreaMatrixView: React.FC<{ data: MatrixStatementData }> = ({ data }
           {rows.map(row => (
             <tr key={row.product._id} className="hover:bg-slate-50 transition-colors">
               <td className="py-3 px-4 sticky left-0 bg-white font-medium text-slate-900 border-r border-slate-200 shadow-xs">
-                <span className="font-mono font-bold text-navy-950 block">{row.product.code}</span>
-                <span className="text-slate-600 block text-[11px] truncate max-w-xs">
-                  {row.product.name}
-                </span>
+                <span className="font-semibold text-navy-950 block">{row.product.name}</span>
+                {(row.product.brand?.name || row.product.category?.name) && (
+                  <span className="text-slate-500 block text-[10px] truncate max-w-xs">
+                    {[row.product.brand?.name, row.product.category?.name].filter(Boolean).join(' • ')}
+                  </span>
+                )}
               </td>
               <td className="py-3 px-3 text-center font-mono text-slate-500 border-r border-slate-200">
                 {row.product.unit}

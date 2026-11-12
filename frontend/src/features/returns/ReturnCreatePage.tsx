@@ -261,7 +261,7 @@ export const ReturnCreatePage: React.FC = () => {
                   const retRemaining = line.quantity - ret;
                   return (
                     <option key={line._id} value={line._id} disabled={retRemaining <= 0}>
-                      Line #{idx + 1}: {line.productId?.name} ({line.productId?.code}) - Sold:{' '}
+                      Line #{idx + 1}: {line.productId?.name} - Sold:{' '}
                       {line.quantity}, Returned: {ret}, Remaining Returnable: {retRemaining}
                     </option>
                   );
@@ -280,7 +280,7 @@ export const ReturnCreatePage: React.FC = () => {
                   Original Line Item Verification
                 </span>
                 <h4 className="text-base font-bold text-white">
-                  {selectedLine.productId?.name} ({selectedLine.productId?.code})
+                  {selectedLine.productId?.name}
                 </h4>
               </div>
               <span className="text-xs font-mono text-slate-300">

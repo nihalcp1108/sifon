@@ -55,9 +55,13 @@ export const PeriodMovementView: React.FC<{ data: PeriodStatementData }> = ({ da
               <tr key={idx} className="hover:bg-slate-50 transition-colors">
                 <td className="py-2.5 px-3 font-sans border-r border-slate-200">
                   <span className="font-bold text-navy-950 block">{row.product.name}</span>
-                  <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                    <span className="font-mono text-slate-600">{row.product.code}</span>
-                    <span>&bull;</span>
+                  <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                    {row.product.brand?.name && (
+                      <>
+                        <span className="font-medium text-slate-600">{row.product.brand.name}</span>
+                        <span>&bull;</span>
+                      </>
+                    )}
                     <span className="font-semibold text-teal-700">{row.area.displayName}</span>
                   </div>
                 </td>

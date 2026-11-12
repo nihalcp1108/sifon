@@ -226,9 +226,6 @@ export const PurchaseDetailPage: React.FC = () => {
                     <td className="py-3 px-4 font-medium text-slate-900">
                       <div>
                         <span>{item.productId?.name || 'Product'}</span>
-                        <span className="block font-mono text-slate-400 text-[11px]">
-                          {item.productId?.code}
-                        </span>
                       </div>
                     </td>
                     <td className="py-3 px-4">
