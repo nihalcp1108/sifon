@@ -18,13 +18,18 @@ export const areasApi = {
       if (params.page !== undefined && params.page !== null) cleanParams.page = params.page;
       if (params.limit !== undefined && params.limit !== null) cleanParams.limit = params.limit;
       if (params.search && params.search.trim()) cleanParams.search = params.search.trim();
-      if (params.sectionId && /^[0-9a-fA-F]{24}$/.test(params.sectionId.trim())) {
-        cleanParams.sectionId = params.sectionId.trim();
+      if (params.sectionId) {
+        const trimmed = params.sectionId.trim();
+        if (trimmed.toLowerCase() === 'unassigned') {
+          cleanParams.sectionId = 'unassigned';
+        } else if (/^[0-9a-fA-F]{24}$/.test(trimmed)) {
+          cleanParams.sectionId = trimmed;
+        }
       }
       if (params.activeOnly !== undefined && params.activeOnly !== null && params.activeOnly !== 'all') {
         cleanParams.activeOnly = params.activeOnly;
       }
-      if (params.isActive !== undefined && params.isActive !== null) {
+      if (params.isActive !== undefined && params.isActive !== null && params.isActive !== 'all') {
         cleanParams.isActive = params.isActive;
       }
     }
@@ -52,8 +57,13 @@ export const areasApi = {
       if (params.limit !== undefined && params.limit !== null) cleanParams.limit = params.limit;
       if (params.page !== undefined && params.page !== null) cleanParams.page = params.page;
       if (params.search && params.search.trim()) cleanParams.search = params.search.trim();
-      if (params.sectionId && /^[0-9a-fA-F]{24}$/.test(params.sectionId.trim())) {
-        cleanParams.sectionId = params.sectionId.trim();
+      if (params.sectionId) {
+        const trimmed = params.sectionId.trim();
+        if (trimmed.toLowerCase() === 'unassigned') {
+          cleanParams.sectionId = 'unassigned';
+        } else if (/^[0-9a-fA-F]{24}$/.test(trimmed)) {
+          cleanParams.sectionId = trimmed;
+        }
       }
       if (params.activeOnly !== undefined && params.activeOnly !== null) cleanParams.activeOnly = params.activeOnly;
       if (params.isActive !== undefined && params.isActive !== null) cleanParams.isActive = params.isActive;

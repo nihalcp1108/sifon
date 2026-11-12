@@ -47,33 +47,42 @@ export class AreaService {
   static async getAreas(query: AreaQueryInput) {
     const filter: Record<string, any> = {};
 
-    const activeFilter = query.activeOnly ?? query.isActive;
-    if (activeFilter === true) {
+    // Filter by isActive only when explicitly requested
+    if (query.isActive !== undefined) {
+      filter.isActive = query.isActive ? { $ne: false } : false;
+    } else if (query.activeOnly === true) {
       filter.isActive = { $ne: false };
-    } else if (activeFilter === false) {
-      filter.isActive = false;
     }
+    // If activeOnly is false or omitted, and isActive is not specified, include ALL areas (both active and inactive)
 
-    if (query.sectionId && mongoose.Types.ObjectId.isValid(query.sectionId)) {
-      filter.sectionId = new mongoose.Types.ObjectId(query.sectionId);
+    if (query.sectionId) {
+      if (query.sectionId === 'unassigned') {
+        const validSections = await Section.find({}, '_id').lean();
+        const validSectionIds = validSections.map(s => s._id);
+        filter.sectionId = { $nin: validSectionIds };
+      } else if (mongoose.Types.ObjectId.isValid(query.sectionId)) {
+        filter.sectionId = new mongoose.Types.ObjectId(query.sectionId);
+      }
     }
 
     if (query.search) {
-      const escaped = query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const trimmed = query.search.trim();
+      const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const searchRegex = new RegExp(escaped, 'i');
       filter.$or = [
         { name: searchRegex },
         { description: searchRegex },
       ];
-      // If search might match a legacy areaNumber
-      if (/^\d+$/.test(query.search.trim())) {
-        filter.$or.push({ areaNumber: parseInt(query.search.trim(), 10) });
+      // Support matching legacy areaNumber
+      const numMatch = trimmed.match(/\d+/);
+      if (numMatch) {
+        filter.$or.push({ areaNumber: parseInt(numMatch[0], 10) });
       }
     }
 
     const total = await Area.countDocuments(filter);
     const page = query.page || 1;
-    const limit = query.limit || 50;
+    const limit = query.limit || 25;
 
     const areas = await Area.find(filter)
       .populate('sectionId', 'name description')
@@ -83,13 +92,19 @@ export class AreaService {
       .lean();
 
     const enrichedAreas = areas.map(a => {
-      const sectionName = (a.sectionId as any)?.name;
+      const section = a.sectionId as any;
+      const hasValidSection = section && typeof section === 'object' && Boolean(section.name);
+      const sectionName = hasValidSection ? section.name : 'Unassigned';
       const areaName = a.name || (a.areaNumber ? `Area ${a.areaNumber}` : 'Unnamed Area');
-      const displayName = sectionName ? `${sectionName} — ${areaName}` : areaName;
+      const displayName = hasValidSection ? `${sectionName} — ${areaName}` : areaName;
+
       return {
         ...a,
         name: areaName,
         displayName,
+        sectionId: hasValidSection ? section : undefined,
+        section: hasValidSection ? { _id: section._id, name: section.name } : undefined,
+        sectionName,
       };
     });
 
@@ -99,7 +114,7 @@ export class AreaService {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / limit) || 1,
       },
     };
   }
@@ -107,23 +122,31 @@ export class AreaService {
   static async getAreaOptions(query: AreaOptionsQueryInput) {
     const filter: Record<string, any> = {};
 
-    const activeFilter = query.activeOnly ?? query.isActive;
-    if (activeFilter === false) {
-      filter.isActive = false;
-    } else {
+    if (query.isActive !== undefined) {
+      filter.isActive = query.isActive ? { $ne: false } : false;
+    } else if (query.activeOnly !== false) {
+      // By default options endpoints filter for active areas unless explicitly requested otherwise
       filter.isActive = { $ne: false };
     }
 
-    if (query.sectionId && mongoose.Types.ObjectId.isValid(query.sectionId)) {
-      filter.sectionId = new mongoose.Types.ObjectId(query.sectionId);
+    if (query.sectionId) {
+      if (query.sectionId === 'unassigned') {
+        const validSections = await Section.find({}, '_id').lean();
+        const validSectionIds = validSections.map(s => s._id);
+        filter.sectionId = { $nin: validSectionIds };
+      } else if (mongoose.Types.ObjectId.isValid(query.sectionId)) {
+        filter.sectionId = new mongoose.Types.ObjectId(query.sectionId);
+      }
     }
 
     if (query.search) {
-      const escaped = query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const trimmed = query.search.trim();
+      const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const searchRegex = new RegExp(escaped, 'i');
       filter.$or = [{ name: searchRegex }, { description: searchRegex }];
-      if (/^\d+$/.test(query.search.trim())) {
-        filter.$or.push({ areaNumber: parseInt(query.search.trim(), 10) });
+      const numMatch = trimmed.match(/\d+/);
+      if (numMatch) {
+        filter.$or.push({ areaNumber: parseInt(numMatch[0], 10) });
       }
     }
 
@@ -149,14 +172,19 @@ export class AreaService {
     }
 
     const enrichedAreas = resultList.map(a => {
-      const sectionName = (a.sectionId as any)?.name;
+      const section = a.sectionId as any;
+      const hasValidSection = section && typeof section === 'object' && Boolean(section.name);
+      const sectionName = hasValidSection ? section.name : 'Unassigned';
       const areaName = a.name || (a.areaNumber ? `Area ${a.areaNumber}` : 'Unnamed Area');
-      const displayName = sectionName ? `${sectionName} — ${areaName}` : areaName;
+      const displayName = hasValidSection ? `${sectionName} — ${areaName}` : areaName;
+
       return {
         _id: a._id,
         name: areaName,
         displayName,
-        sectionId: a.sectionId,
+        sectionId: hasValidSection ? section : undefined,
+        section: hasValidSection ? { _id: section._id, name: section.name } : undefined,
+        sectionName,
         areaNumber: a.areaNumber,
         description: a.description,
         isActive: a.isActive,
@@ -172,7 +200,7 @@ export class AreaService {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / limit) || 1,
       },
     };
   }
@@ -198,22 +226,25 @@ export class AreaService {
     }
 
     // Determine target section
-    const targetSectionId = input.sectionId !== undefined ? input.sectionId : area.sectionId;
-    const targetName = input.name !== undefined ? input.name.trim() : (area.name || `Area ${area.areaNumber || ''}`);
-
-    if (input.sectionId !== undefined && input.sectionId) {
-      if (!mongoose.Types.ObjectId.isValid(input.sectionId)) {
-        throw new ValidationError('Invalid Section ID');
+    let targetSectionId = area.sectionId;
+    if (input.sectionId !== undefined) {
+      if (input.sectionId) {
+        if (!mongoose.Types.ObjectId.isValid(input.sectionId)) {
+          throw new ValidationError('Invalid Section ID');
+        }
+        const section = await Section.findById(input.sectionId);
+        if (!section) {
+          throw new NotFoundError(`Section not found: ${input.sectionId}`);
+        }
+        area.sectionId = section._id;
+        targetSectionId = section._id;
       }
-      const section = await Section.findById(input.sectionId);
-      if (!section) {
-        throw new NotFoundError(`Section not found: ${input.sectionId}`);
-      }
-      area.sectionId = section._id;
     }
 
-    if (input.name !== undefined) {
-      // Validate uniqueness within section if sectionId exists
+    const targetName = input.name !== undefined ? input.name.trim() : (area.name || (area.areaNumber ? `Area ${area.areaNumber}` : 'Unnamed Area'));
+
+    if (input.name !== undefined || input.sectionId !== undefined) {
+      // Validate uniqueness within target section
       if (targetSectionId) {
         const escaped = targetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const existing = await Area.findOne({
@@ -232,7 +263,7 @@ export class AreaService {
     if (input.isActive === false && area.isActive === true) {
       const hasStock = await InventoryService.checkAreaHasStock(area._id);
       if (hasStock) {
-        const label = area.name || (area.areaNumber ? `Area ${area.areaNumber}` : 'this area');
+        const label = area.displayName || area.name || (area.areaNumber ? `Area ${area.areaNumber}` : 'this area');
         throw new BadRequestError(
           `Cannot deactivate ${label} while available or damaged stock remains in it.`
         );
@@ -261,8 +292,9 @@ export class AreaService {
 
     // Check if area was used in inventory history or has stock
     const hasHistory = await InventoryService.checkAreaHasHistory(area._id);
-    if (hasHistory) {
-      const label = area.name || (area.areaNumber ? `Area ${area.areaNumber}` : 'this area');
+    const hasStock = await InventoryService.checkAreaHasStock(area._id);
+    if (hasHistory || hasStock) {
+      const label = (area as any).displayName || area.name || (area.areaNumber ? `Area ${area.areaNumber}` : 'this area');
       throw new BadRequestError(
         `Cannot delete ${label} because it has historical inventory transactions or active stock. Consider deactivating it instead.`
       );

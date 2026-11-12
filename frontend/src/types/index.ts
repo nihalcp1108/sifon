@@ -40,6 +40,7 @@ export interface Area {
   name?: string;
   sectionId?: string | Section;
   section?: Section;
+  sectionName?: string;
   areaNumber?: number;
   displayName: string;
   description?: string;

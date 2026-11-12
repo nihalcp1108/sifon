@@ -6,7 +6,8 @@ export class AreaController {
   static async createArea(req: Request, res: Response, next: NextFunction) {
     try {
       const area = await AreaService.createArea(req.body);
-      return sendCreated(res, area, `Area ${area.areaNumber} created successfully`);
+      const label = (area as any).displayName || area.name || (area.areaNumber ? `Area ${area.areaNumber}` : 'Area');
+      return sendCreated(res, area, `${label} created successfully`);
     } catch (error) {
       next(error);
     }
@@ -44,7 +45,8 @@ export class AreaController {
   static async updateArea(req: Request, res: Response, next: NextFunction) {
     try {
       const area = await AreaService.updateArea(req.params.id as string, req.body);
-      return sendSuccess(res, area, `Area ${area.areaNumber} updated successfully`);
+      const label = (area as any).displayName || area.name || (area.areaNumber ? `Area ${area.areaNumber}` : 'Area');
+      return sendSuccess(res, area, `${label} updated successfully`);
     } catch (error) {
       next(error);
     }

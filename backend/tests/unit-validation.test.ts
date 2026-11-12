@@ -6,6 +6,9 @@ import {
 import {
   areaQuerySchema,
   areaOptionsQuerySchema,
+  createAreaSchema,
+  updateAreaSchema,
+  sectionFilterQueryParam,
 } from '../src/modules/areas/area.validation.js';
 import {
   objectIdRegex,
@@ -69,7 +72,7 @@ describe('Unit Validation Tests', () => {
     expect(() => productQuerySchema.parse({ activeOnly: 'notabool' })).toThrow(/Must be a boolean value/);
   });
 
-  it('Area Query Schema handles numeric pagination, bounds, and boolean activeOnly/isActive', () => {
+  it('Area Query Schema handles numeric pagination, bounds, boolean activeOnly/isActive, and sectionId filtering', () => {
     const parsed100 = areaQuerySchema.parse({ limit: '100', activeOnly: 'true' });
     expect(parsed100.limit).toBe(100);
     expect(parsed100.activeOnly).toBe(true);
@@ -81,8 +84,60 @@ describe('Unit Validation Tests', () => {
     const parsedFalse = areaQuerySchema.parse({ activeOnly: 'false' });
     expect(parsedFalse.activeOnly).toBe(false);
 
+    // Section filtering: hex ObjectId, unassigned, all/empty
+    const parsedHex = areaQuerySchema.parse({ sectionId: '507f1f77bcf86cd799439011' });
+    expect(parsedHex.sectionId).toBe('507f1f77bcf86cd799439011');
+
+    const parsedUnassigned = areaQuerySchema.parse({ sectionId: 'unassigned' });
+    expect(parsedUnassigned.sectionId).toBe('unassigned');
+
+    const parsedUnassignedUpper = areaQuerySchema.parse({ sectionId: '  UNASSIGNED  ' });
+    expect(parsedUnassignedUpper.sectionId).toBe('unassigned');
+
+    const parsedAll = areaQuerySchema.parse({ sectionId: 'all' });
+    expect(parsedAll.sectionId).toBeUndefined();
+
+    const parsedEmpty = areaQuerySchema.parse({ sectionId: '   ' });
+    expect(parsedEmpty.sectionId).toBeUndefined();
+
+    expect(() => areaQuerySchema.parse({ sectionId: 'invalid-id' })).toThrow(/Invalid Section ID format/);
     expect(() => areaQuerySchema.parse({ limit: '1001' })).toThrow(/maximum allowed value/);
     expect(() => areaQuerySchema.parse({ limit: '0' })).toThrow(/positive integer/);
+  });
+
+  it('Create and Update Area Schemas enforce required names, trimmed strings, and valid sectionIds', () => {
+    const validCreate = createAreaSchema.parse({
+      name: '  Main Storage Bay  ',
+      sectionId: '507f1f77bcf86cd799439011',
+      description: 'Primary storage area',
+    });
+    expect(validCreate.name).toBe('Main Storage Bay');
+    expect(validCreate.sectionId).toBe('507f1f77bcf86cd799439011');
+    expect(validCreate.description).toBe('Primary storage area');
+
+    // Name cannot be empty or whitespace only
+    expect(() =>
+      createAreaSchema.parse({
+        name: '   ',
+        sectionId: '507f1f77bcf86cd799439011',
+      })
+    ).toThrow(/Area name cannot be empty/);
+
+    // Section ID required on create
+    expect(() =>
+      createAreaSchema.parse({
+        name: 'Bay 1',
+        sectionId: '',
+      })
+    ).toThrow(/Invalid Section ID format/);
+
+    // Update Area schema allows partial fields
+    const validUpdate = updateAreaSchema.parse({
+      name: '  Updated Bay Name  ',
+      isActive: false,
+    });
+    expect(validUpdate.name).toBe('Updated Bay Name');
+    expect(validUpdate.isActive).toBe(false);
   });
 
   it('Dedicated productOptionsQuerySchema and areaOptionsQuerySchema handle dropdown requirements', () => {

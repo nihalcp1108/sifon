@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Plus, AlertCircle } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
@@ -45,6 +45,7 @@ export const AreaFormModal: React.FC<AreaFormModalProps> = ({
   const queryClient = useQueryClient();
   const toast = useToast();
   const [sectionModalOpen, setSectionModalOpen] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     register,
@@ -59,16 +60,23 @@ export const AreaFormModal: React.FC<AreaFormModalProps> = ({
 
   const selectedSectionId = watch('sectionId');
 
+  const editingSectionId = editingArea
+    ? typeof editingArea.sectionId === 'object' && editingArea.sectionId
+      ? (editingArea.sectionId as any)._id
+      : (editingArea.sectionId as string) || undefined
+    : undefined;
+
   // Load section options
   const { data: sectionData, isLoading: loadingSections } = useQuery({
-    queryKey: ['sections', 'options'],
-    queryFn: () => sectionsApi.getSectionOptions({ limit: 200, activeOnly: 'true' }),
+    queryKey: ['sections', 'options', editingSectionId],
+    queryFn: () => sectionsApi.getSectionOptions({ limit: 200, activeOnly: 'true', selectedId: editingSectionId }),
     enabled: isOpen,
   });
 
   const sections = sectionData?.data || [];
 
   useEffect(() => {
+    setFormError(null);
     if (editingArea) {
       const sectionIdVal =
         typeof editingArea.sectionId === 'object' && editingArea.sectionId
@@ -106,8 +114,14 @@ export const AreaFormModal: React.FC<AreaFormModalProps> = ({
   });
 
   const handleFormSubmit = async (data: AreaFormData) => {
-    await onSubmit(data);
-    onClose();
+    try {
+      setFormError(null);
+      await onSubmit(data);
+      onClose();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Failed to save area';
+      setFormError(msg);
+    }
   };
 
   return (
@@ -124,6 +138,15 @@ export const AreaFormModal: React.FC<AreaFormModalProps> = ({
         maxWidth="md"
       >
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+          {formError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold">Unable to save area</p>
+                <p className="mt-0.5">{formError}</p>
+              </div>
+            </div>
+          )}
           <Input
             label="Area Name"
             placeholder="e.g. Main Store, Rack A-1, Bulk Bay 3..."

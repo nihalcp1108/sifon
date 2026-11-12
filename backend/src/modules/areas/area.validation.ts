@@ -26,13 +26,25 @@ export const updateAreaSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+// Preprocessor for sectionId filter query parameter: accepts 24-hex ObjectId, 'unassigned', or undefined
+export const sectionFilterQueryParam = z.preprocess((val) => {
+  if (val === undefined || val === null) return undefined;
+  if (typeof val === 'string') {
+    const clean = val.trim();
+    if (clean === '' || clean === 'undefined' || clean === 'null' || clean === 'all') return undefined;
+    if (clean.toLowerCase() === 'unassigned') return 'unassigned';
+    return clean;
+  }
+  return val;
+}, z.union([z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid Section ID format'), z.literal('unassigned')]).optional());
+
 export const areaQuerySchema = z.object({
   page: positiveIntQueryParam(1),
-  limit: positiveIntQueryParam(50, 1000),
+  limit: positiveIntQueryParam(25, 1000),
   activeOnly: booleanQueryParam,
   isActive: booleanQueryParam,
   search: z.string().trim().optional(),
-  sectionId: optionalObjectIdQueryParam,
+  sectionId: sectionFilterQueryParam,
 });
 
 export const areaOptionsQuerySchema = z.object({
@@ -42,7 +54,7 @@ export const areaOptionsQuerySchema = z.object({
   isActive: booleanQueryParam,
   selectedId: optionalObjectIdQueryParam,
   search: z.string().trim().optional(),
-  sectionId: optionalObjectIdQueryParam,
+  sectionId: sectionFilterQueryParam,
 });
 
 export type CreateAreaInput = z.infer<typeof createAreaSchema>;
