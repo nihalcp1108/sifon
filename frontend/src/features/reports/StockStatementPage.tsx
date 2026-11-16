@@ -87,7 +87,7 @@ export const StockStatementPage: React.FC = () => {
         const url = window.URL.createObjectURL(new Blob([blob]));
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', `sifon-stock-matrix-${todayStr}.csv`);
+        link.setAttribute('download', `s-and-m-stock-matrix-${todayStr}.csv`);
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -103,7 +103,7 @@ export const StockStatementPage: React.FC = () => {
         const url = window.URL.createObjectURL(new Blob([blob]));
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', `sifon-period-statement-${startDate}-to-${endDate}.csv`);
+        link.setAttribute('download', `s-and-m-period-statement-${startDate}-to-${endDate}.csv`);
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -154,9 +154,9 @@ export const StockStatementPage: React.FC = () => {
       <div className="hidden print:block mb-6 border-b border-slate-300 pb-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-navy-950">Sifon Stock Management</h1>
+            <h1 className="text-2xl font-bold text-navy-950">S AND M Stock Management</h1>
             <h2 className="text-sm font-semibold text-slate-600 mt-1">
-              {activeTab === 'matrix' ? 'Current Area-Wise Stock Matrix' : `Period Movement Statement (${startDate} to ${endDate})`}
+              {activeTab === 'matrix' ? 'Current Location-Wise Stock Matrix' : `Period Movement Statement (${startDate} to ${endDate})`}
             </h2>
           </div>
           <div className="text-right text-xs text-slate-500">
@@ -179,7 +179,7 @@ export const StockStatementPage: React.FC = () => {
             }`}
           >
             <FileSpreadsheet className="w-4 h-4" />
-            View A: Current Area Stock Matrix
+            View A: Current Location Stock Matrix
           </button>
           <button
             onClick={() => setActiveTab('period')}
@@ -225,16 +225,16 @@ export const StockStatementPage: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-1.5">
-              <span className="font-semibold text-slate-500 uppercase tracking-wider">Area:</span>
+              <span className="font-semibold text-slate-500 uppercase tracking-wider">Location:</span>
               <select
                 value={matrixAreaId}
                 onChange={e => setMatrixAreaId(e.target.value)}
                 className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium"
               >
-                <option value="">All Areas</option>
+                <option value="">All Locations</option>
                 {areas.map(a => (
                   <option key={a._id} value={a._id}>
-                    {a.displayName}
+                    {a.displayName || a.name}
                   </option>
                 ))}
               </select>
@@ -297,16 +297,16 @@ export const StockStatementPage: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-1.5">
-              <span className="font-semibold text-slate-500 uppercase tracking-wider">Area:</span>
+              <span className="font-semibold text-slate-500 uppercase tracking-wider">Location:</span>
               <select
                 value={periodAreaId}
                 onChange={e => setPeriodAreaId(e.target.value)}
                 className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-medium text-slate-700"
               >
-                <option value="">All Areas</option>
+                <option value="">All Locations</option>
                 {areas.map(a => (
                   <option key={a._id} value={a._id}>
-                    {a.displayName}
+                    {a.displayName || a.name}
                   </option>
                 ))}
               </select>

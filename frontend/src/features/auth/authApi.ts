@@ -38,5 +38,30 @@ export const authApi = {
     );
     return res.data;
   },
+
+  listUsers: async () => {
+    const res = await apiClient.get<{ data: User[] }>('/auth/users');
+    return res.data.data;
+  },
+
+  createProductViewer: async (data: { email: string; password: string }) => {
+    const res = await apiClient.post<{ data: User }>('/auth/users', data);
+    return res.data.data;
+  },
+
+  resetUserPassword: async (id: string, newPassword: string) => {
+    const res = await apiClient.put<{ success: boolean; message: string }>(`/auth/users/${id}/password`, {
+      password: newPassword,
+      newPassword,
+    });
+    return res.data;
+  },
+
+  toggleUserStatus: async (id: string, isActive: boolean) => {
+    const res = await apiClient.put<{ data: User }>(`/auth/users/${id}/status`, {
+      isActive,
+    });
+    return res.data.data;
+  },
 };
 

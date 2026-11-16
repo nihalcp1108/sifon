@@ -215,7 +215,7 @@ export const PurchaseDetailPage: React.FC = () => {
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase">
                   <th className="py-2.5 px-4">Line #</th>
                   <th className="py-2.5 px-4">Product</th>
-                  <th className="py-2.5 px-4">Receiving Area</th>
+                  <th className="py-2.5 px-4">Receiving Location</th>
                   <th className="py-2.5 px-4 text-right">Received Quantity</th>
                 </tr>
               </thead>
@@ -230,7 +230,7 @@ export const PurchaseDetailPage: React.FC = () => {
                     </td>
                     <td className="py-3 px-4">
                       <span className="font-semibold text-navy-950">
-                        {item.receivingAreaId?.displayName || 'Area'}
+                        {item.receivingAreaId?.displayName || 'Location'}
                       </span>
                       {item.receivingAreaId?.description && (
                         <span className="block text-[11px] text-slate-400">
@@ -254,7 +254,7 @@ export const PurchaseDetailPage: React.FC = () => {
         isOpen={cancelModalOpen}
         onClose={() => setCancelModalOpen(false)}
         title="Cancel & Reverse Purchase?"
-        message="Are you sure you want to cancel this posted purchase? Reversing this purchase will deduct the received quantities from the receiving areas. This operation will be rejected if deducting the quantity would cause available stock to become negative."
+        message="Are you sure you want to cancel this posted purchase? Reversing this purchase will deduct the received quantities from the receiving locations. This operation will be rejected if deducting the quantity would cause available stock to become negative."
         confirmText="Cancel Purchase & Reverse Stock"
         variant="danger"
         requireReason={true}

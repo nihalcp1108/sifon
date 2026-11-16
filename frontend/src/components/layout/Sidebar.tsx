@@ -1,10 +1,9 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard,
   Tag,
   Layers,
-  Boxes,
+  MapPin,
   Package,
   Truck,
   ShoppingBag,
@@ -14,14 +13,15 @@ import {
   Settings,
   X,
   Warehouse,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useAuth } from '../../features/auth/useAuth';
 
-const navItems = [
-  { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
+const adminNavItems = [
   { label: 'Brand', to: '/brands', icon: Tag },
   { label: 'Category', to: '/categories', icon: Layers },
-  { label: 'Area', to: '/areas', icon: Boxes },
+  { label: 'Location', to: '/locations', icon: MapPin },
   { label: 'Product', to: '/products', icon: Package },
   { label: 'Purchase', to: '/purchases', icon: Truck },
   { label: 'Sales', to: '/sales', icon: ShoppingBag },
@@ -31,10 +31,17 @@ const navItems = [
   { label: 'Account Settings', to: '/settings', icon: Settings },
 ];
 
+const viewerNavItems = [
+  { label: 'Product', to: '/products', icon: Package },
+];
+
 export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
   isOpen,
   onClose,
 }) => {
+  const { user, logout } = useAuth();
+  const navItems = user?.role === 'PRODUCT_VIEWER' ? viewerNavItems : adminNavItems;
+
   return (
     <>
       {/* Mobile backdrop */}
@@ -59,7 +66,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
               <Warehouse className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-xl font-bold tracking-tight text-white">Sifon</span>
+              <span className="text-xl font-bold tracking-tight text-white">S AND M</span>
               <span className="block text-[10px] text-teal-400 font-medium tracking-wider uppercase -mt-1">
                 Stock Management
               </span>
@@ -105,11 +112,24 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
               </NavLink>
             );
           })}
+
+          {user?.role === 'PRODUCT_VIEWER' && (
+            <button
+              onClick={() => {
+                onClose();
+                logout();
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-rose-950/40 hover:text-rose-400 transition-colors mt-4"
+            >
+              <LogOut className="w-5 h-5 text-slate-400" />
+              <span>Logout</span>
+            </button>
+          )}
         </nav>
 
         {/* Footer info */}
         <div className="p-4 border-t border-navy-900/80 text-xs text-slate-400">
-          <p className="font-semibold text-slate-300">Sifon Stock Engine</p>
+          <p className="font-semibold text-slate-300">S AND M Stock Engine</p>
           <p className="text-[11px] text-slate-400">Double-entry audit verification</p>
         </div>
       </aside>

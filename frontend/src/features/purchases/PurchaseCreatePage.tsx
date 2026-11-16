@@ -11,15 +11,16 @@ import { areasApi } from '../areas/areasApi';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
-import { Select } from '../../components/common/Select';
 import { useToast } from '../../components/common/Toast';
 import { generateIdempotencyKey } from '../../lib/utils';
-import { ProductSelector } from '../products/ProductSelector';
+import { SearchableProductSelect } from '../products/SearchableProductSelect';
+import { SearchableLocationSelect } from '../areas/SearchableLocationSelect';
+import { ProductStockBreakdown } from '../products/ProductStockBreakdown';
 import { ProductFormModal } from '../products/ProductFormModal';
 
 const purchaseItemSchema = z.object({
   productId: z.string().min(1, 'Please select a product'),
-  receivingAreaId: z.string().min(1, 'Please select receiving area'),
+  receivingAreaId: z.string().min(1, 'Please select receiving location'),
   quantity: z.coerce
     .number({ invalid_type_error: 'Quantity must be a valid number' })
     .int('Quantity must be an integer')
@@ -48,7 +49,6 @@ export const PurchaseCreatePage: React.FC = () => {
   // Fetch active warehouse areas using dedicated lookup endpoint
   const {
     data: areasData,
-    isLoading: isAreasLoading,
     isError: isAreasError,
     error: areasError,
     refetch: refetchAreas,
@@ -181,7 +181,7 @@ export const PurchaseCreatePage: React.FC = () => {
 
       <PageHeader
         title="Record New Purchase"
-        subtitle="Inbound shipment entry. Posted purchases atomically increase available stock in the receiving areas."
+        subtitle="Inbound shipment entry. Posted purchases atomically increase available stock in the receiving locations."
       />
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -235,7 +235,7 @@ export const PurchaseCreatePage: React.FC = () => {
                 Purchase Line Items
               </h3>
               <p className="text-xs text-slate-500">
-                Specify product, designated receiving area, and incoming quantity (existing stock not required)
+                Specify product, designated receiving location, and incoming quantity (existing stock not required)
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -295,44 +295,43 @@ export const PurchaseCreatePage: React.FC = () => {
                   key={field.id}
                   className="flex flex-col sm:flex-row items-start gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200"
                 >
-                  <div className="flex-1 w-full">
+                  <div className="flex-1 w-full space-y-2">
                     <Controller
                       control={control}
                       name={`items.${idx}.productId`}
                       render={({ field: pField }) => (
-                        <ProductSelector
+                        <SearchableProductSelect
                           id={`items.${idx}.productId`}
                           label={`Product #${idx + 1}`}
                           value={pField.value}
-                          onChange={pField.onChange}
-                          onBlur={pField.onBlur}
-                          mode="purchase"
+                          onChange={(val) => {
+                            pField.onChange(val);
+                          }}
                           error={errors.items?.[idx]?.productId?.message}
-                          onAddNewProduct={() => setIsProductModalOpen(true)}
                         />
                       )}
                     />
+                    {watch(`items.${idx}.productId`) && (
+                      <ProductStockBreakdown productId={watch(`items.${idx}.productId`)} />
+                    )}
                   </div>
 
                   <div className="flex-1 w-full">
-                    <Select
-                      label="Receiving Area"
-                      error={errors.items?.[idx]?.receivingAreaId?.message}
-                      {...register(`items.${idx}.receivingAreaId`)}
-                    >
-                      <option value="">
-                        {isAreasLoading
-                          ? '-- Loading areas... --'
-                          : activeAreas.length === 0
-                          ? '-- No active areas --'
-                          : '-- Select Receiving Area --'}
-                      </option>
-                      {activeAreas.map(a => (
-                        <option key={a._id} value={a._id}>
-                          {a.displayName || `Area ${a.areaNumber}`} {a.description ? `(${a.description})` : ''}
-                        </option>
-                      ))}
-                    </Select>
+                    <Controller
+                      control={control}
+                      name={`items.${idx}.receivingAreaId`}
+                      render={({ field: locField }) => (
+                        <SearchableLocationSelect
+                          id={`items.${idx}.receivingAreaId`}
+                          label="Receiving Location"
+                          value={locField.value}
+                          onChange={locField.onChange}
+                          mode="purchase"
+                          productId={watch(`items.${idx}.productId`)}
+                          error={errors.items?.[idx]?.receivingAreaId?.message}
+                        />
+                      )}
+                    />
                   </div>
 
                   <div className="w-full sm:w-32">

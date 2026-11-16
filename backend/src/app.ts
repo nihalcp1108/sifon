@@ -8,7 +8,7 @@ import { NotFoundError } from './utils/errors.js';
 import { apiRateLimiter } from './middleware/rateLimiter.js';
 
 // Routers
-import authRouter from './modules/auth/auth.router.js';
+import authRouter, { usersRouter } from './modules/auth/auth.router.js';
 import dashboardRouter from './modules/dashboard/dashboard.router.js';
 import brandsRouter from './modules/brands/brand.router.js';
 import categoriesRouter from './modules/categories/category.router.js';
@@ -101,6 +101,7 @@ export function createApp(): express.Application {
   // API v1 routes
   const apiV1 = express.Router();
   apiV1.use('/auth', authRouter);
+  apiV1.use('/users', usersRouter);
   apiV1.use('/dashboard', dashboardRouter);
   apiV1.use('/brands', brandsRouter);
   apiV1.use('/categories', categoriesRouter);

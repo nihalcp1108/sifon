@@ -1,78 +1,50 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ArrowLeft, RotateCcw, AlertCircle } from 'lucide-react';
 import { returnsApi } from './returnsApi';
-import { salesApi } from '../sales/salesApi';
-import { areasApi } from '../areas/areasApi';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
-import { Select } from '../../components/common/Select';
 import { useToast } from '../../components/common/Toast';
 import { generateIdempotencyKey } from '../../lib/utils';
-import { SaleItem } from '../../types';
+import { SearchableProductSelect } from '../products/SearchableProductSelect';
+import { SearchableLocationSelect } from '../areas/SearchableLocationSelect';
+import { ProductStockBreakdown } from '../products/ProductStockBreakdown';
 
-const returnFormSchema = z
-  .object({
-    reference: z.string().trim().max(50).optional(),
-    returnDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Valid date required (YYYY-MM-DD)'),
-    saleId: z.string().min(1, 'Please select an original sale'),
-    saleLineId: z.string().min(1, 'Please select a sale line item'),
-    receivingAreaId: z.string().min(1, 'Please select receiving area'),
-    nonDamagedQuantity: z.coerce
-      .number()
-      .int()
-      .min(0, 'Cannot be negative')
-      .default(0),
-    damagedQuantity: z.coerce
-      .number()
-      .int()
-      .min(0, 'Cannot be negative')
-      .default(0),
-    reason: z.string().trim().min(3, 'Reason is required (minimum 3 characters)').max(500),
-  })
-  .refine(data => data.nonDamagedQuantity > 0 || data.damagedQuantity > 0, {
-    message: 'At least one of non-damaged or damaged quantity must be greater than zero',
-    path: ['nonDamagedQuantity'],
-  });
+const returnFormSchema = z.object({
+  reference: z.string().trim().max(50, 'Reference cannot exceed 50 characters').optional(),
+  returnDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Valid date required (YYYY-MM-DD)'),
+  productId: z.string().min(1, 'Please select a product'),
+  receivingAreaId: z.string().min(1, 'Please select destination location'),
+  quantity: z.coerce
+    .number({ invalid_type_error: 'Quantity must be a valid number' })
+    .int('Quantity must be an integer')
+    .positive('Quantity must be at least 1'),
+  condition: z.enum(['USABLE', 'DAMAGED'], {
+    errorMap: () => ({ message: 'Please select condition' }),
+  }),
+  notes: z.string().trim().min(2, 'Notes or reason is required').max(1000, 'Notes cannot exceed 1000 characters'),
+});
 
 type ReturnFormData = z.infer<typeof returnFormSchema>;
 
 export const ReturnCreatePage: React.FC = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const toast = useToast();
-
-  const initialSaleId = searchParams.get('saleId') || '';
-  const todayStr = new Date().toISOString().split('T')[0];
-
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Fetch posted sales for dropdown
-  const { data: salesData } = useQuery({
-    queryKey: ['sales-posted-dropdown'],
-    queryFn: () => salesApi.getSales({ status: 'POSTED', limit: 100 }),
-  });
-
-  // Fetch active warehouse areas
-  const { data: areasData } = useQuery({
-    queryKey: ['areas', 'options'],
-    queryFn: ({ signal }) => areasApi.getAreaOptions({ activeOnly: true, limit: 100 }, signal),
-  });
-
-  const postedSales = salesData?.data || [];
-  const activeAreas = areasData?.data || [];
+  const todayStr = new Date().toISOString().split('T')[0];
 
   const {
     register,
+    control,
     handleSubmit,
     watch,
-    setValue,
     setError,
     clearErrors,
     formState: { errors },
@@ -80,57 +52,27 @@ export const ReturnCreatePage: React.FC = () => {
     resolver: zodResolver(returnFormSchema),
     defaultValues: {
       returnDate: todayStr,
-      saleId: initialSaleId,
-      saleLineId: '',
+      productId: '',
       receivingAreaId: '',
-      nonDamagedQuantity: 0,
-      damagedQuantity: 0,
-      reason: '',
+      quantity: 1,
+      condition: 'USABLE',
+      notes: '',
     },
   });
 
-  const selectedSaleId = watch('saleId');
-  const selectedSaleLineId = watch('saleLineId');
-  const nonDamagedQty = watch('nonDamagedQuantity') || 0;
-  const damagedQty = watch('damagedQuantity') || 0;
-
-  // Selected sale object
-  const selectedSale = postedSales.find(s => s._id === selectedSaleId);
-
-  // Selected sale line item
-  const selectedLine: SaleItem | undefined = selectedSale?.items.find(
-    i => i._id === selectedSaleLineId
-  );
-
-  // Update receiving area when sale line changes
-  useEffect(() => {
-    if (selectedLine) {
-      const defaultAreaId =
-        (selectedLine.sourceAreaId as any)?._id || (selectedLine.sourceAreaId as any);
-      if (defaultAreaId) {
-        setValue('receivingAreaId', defaultAreaId.toString());
-      }
-    }
-  }, [selectedLine, setValue]);
-
-  // Limits calculation
-  const soldQty = selectedLine ? selectedLine.quantity : 0;
-  const alreadyReturned = selectedLine ? selectedLine.returnedQuantity || 0 : 0;
-  const remainingReturnable = Math.max(0, soldQty - alreadyReturned);
-  const totalReturning = nonDamagedQty + damagedQty;
-  const isOverLimit = totalReturning > remainingReturnable;
+  const selectedProductId = watch('productId');
+  const selectedCondition = watch('condition');
 
   const createMutation = useMutation({
-    mutationFn: ({ data, key }: { data: ReturnFormData; key: string }) =>
+    mutationFn: ({ data, key }: { data: any; key: string }) =>
       returnsApi.createReturn(data, key),
     onSuccess: (returnDoc) => {
       queryClient.invalidateQueries({ queryKey: ['returns'] });
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['reports'] });
       queryClient.invalidateQueries({ queryKey: ['damaged'] });
-      toast.success(`Customer return ${returnDoc.reference} processed successfully.`);
+      toast.success(`Return ${returnDoc.reference} processed successfully.`);
       navigate(`/returns/${returnDoc._id}`);
     },
     onError: (err: any) => {
@@ -140,25 +82,18 @@ export const ReturnCreatePage: React.FC = () => {
   });
 
   const onSubmit = async (data: ReturnFormData) => {
-    if (isOverLimit) {
-      setSubmitError(
-        `Total return quantity (${totalReturning}) cannot exceed remaining returnable quantity (${remainingReturnable}).`
-      );
-      return;
-    }
-
     setSubmitError(null);
     clearErrors();
 
     const key = generateIdempotencyKey('ret');
-    const cleanPayload: ReturnFormData = {
+    const cleanPayload = {
       returnDate: data.returnDate,
-      saleId: data.saleId.trim(),
-      saleLineId: data.saleLineId.trim(),
-      receivingAreaId: data.receivingAreaId?.trim() || '',
-      nonDamagedQuantity: Math.floor(Number(data.nonDamagedQuantity) || 0),
-      damagedQuantity: Math.floor(Number(data.damagedQuantity) || 0),
-      reason: data.reason.trim(),
+      productId: data.productId.trim(),
+      receivingAreaId: data.receivingAreaId.trim(),
+      quantity: Math.floor(Number(data.quantity)),
+      condition: data.condition,
+      notes: data.notes.trim(),
+      reason: data.notes.trim(),
       ...(data.reference?.trim() ? { reference: data.reference.trim() } : {}),
     };
 
@@ -208,8 +143,8 @@ export const ReturnCreatePage: React.FC = () => {
       </div>
 
       <PageHeader
-        title="Record Customer Sales Return"
-        subtitle="Link return directly to original sale line. Non-damaged restores available stock; damaged goes to separate damaged inventory."
+        title="Record Product Return"
+        subtitle="Process product returns. Usable returns restore available stock in the destination location; damaged returns increase damaged inventory without increasing usable stock."
       />
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -220,175 +155,157 @@ export const ReturnCreatePage: React.FC = () => {
           </div>
         )}
 
-        {/* Return Header */}
+        {/* General Information */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
           <h3 className="text-sm font-bold text-navy-950 uppercase tracking-wider">
-            1. Sale Selection
+            General Information
           </h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Select
-              label="Original Sale Order"
-              error={errors.saleId?.message}
-              {...register('saleId')}
-            >
-              <option value="">-- Choose Sale Order --</option>
-              {postedSales.map(s => (
-                <option key={s._id} value={s._id}>
-                  {s.reference} &bull; {s.items.length} items &bull; ({s.saleDate?.substring(0, 10)})
-                </option>
-              ))}
-            </Select>
-
             <Input
               label="Return Date"
               type="date"
               error={errors.returnDate?.message}
               {...register('returnDate')}
             />
-          </div>
 
-          {selectedSale && (
-            <div>
-              <Select
-                label="Select Sold Product Line"
-                error={errors.saleLineId?.message}
-                {...register('saleLineId')}
-              >
-                <option value="">-- Select line item to return --</option>
-                {selectedSale.items.map((line, idx) => {
-                  const ret = line.returnedQuantity || 0;
-                  const retRemaining = line.quantity - ret;
-                  return (
-                    <option key={line._id} value={line._id} disabled={retRemaining <= 0}>
-                      Line #{idx + 1}: {line.productId?.name} - Sold:{' '}
-                      {line.quantity}, Returned: {ret}, Remaining Returnable: {retRemaining}
-                    </option>
-                  );
-                })}
-              </Select>
-            </div>
-          )}
+            <Input
+              label="Return Reference (Optional)"
+              placeholder="Leave blank to auto-generate (e.g. RET-20261106-0001)"
+              error={errors.reference?.message}
+              {...register('reference')}
+            />
+          </div>
         </div>
 
-        {/* Selected Line Item Verification Card */}
-        {selectedLine && (
-          <div className="bg-navy-900 text-white p-5 rounded-xl border border-navy-800 shadow-md">
-            <div className="flex items-center justify-between mb-3 border-b border-navy-800 pb-3">
-              <div>
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-teal-400 block">
-                  Original Line Item Verification
-                </span>
-                <h4 className="text-base font-bold text-white">
-                  {selectedLine.productId?.name}
-                </h4>
-              </div>
-              <span className="text-xs font-mono text-slate-300">
-                Original Area: {selectedLine.sourceAreaId?.displayName}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div className="p-2 rounded-lg bg-navy-950/60 border border-navy-800">
-                <span className="block text-[11px] text-slate-400 uppercase">Sold Quantity</span>
-                <span className="text-xl font-bold font-mono text-white">{soldQty}</span>
-              </div>
-              <div className="p-2 rounded-lg bg-navy-950/60 border border-navy-800">
-                <span className="block text-[11px] text-slate-400 uppercase">Already Returned</span>
-                <span className="text-xl font-bold font-mono text-amber-400">{alreadyReturned}</span>
-              </div>
-              <div className="p-2 rounded-lg bg-teal-950/60 border border-teal-800">
-                <span className="block text-[11px] text-teal-300 uppercase">Max Returnable</span>
-                <span className="text-xl font-bold font-mono text-teal-400">{remainingReturnable}</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Return Details */}
+        {/* Product & Location Details */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
           <h3 className="text-sm font-bold text-navy-950 uppercase tracking-wider">
-            2. Return Quantities & Receiving Area
+            Product & Return Destination
           </h3>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="space-y-4">
             <div>
-              <Input
-                label="Non-Damaged Quantity"
-                type="number"
-                min="0"
-                step="1"
-                placeholder="0"
-                error={errors.nonDamagedQuantity?.message}
-                helperText="Restores available stock"
-                {...register('nonDamagedQuantity')}
+              <Controller
+                control={control}
+                name="productId"
+                render={({ field }) => (
+                  <SearchableProductSelect
+                    id="productId"
+                    label="Product"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.productId?.message}
+                  />
+                )}
               />
-            </div>
-
-            <div>
-              <Input
-                label="Damaged Quantity"
-                type="number"
-                min="0"
-                step="1"
-                placeholder="0"
-                error={errors.damagedQuantity?.message}
-                helperText="Moves to separate damaged stock"
-                {...register('damagedQuantity')}
-              />
-            </div>
-
-            <div>
-              <Select
-                label="Receiving Storage Area"
-                error={errors.receivingAreaId?.message}
-                helperText="Defaults to original sale area"
-                {...register('receivingAreaId')}
-              >
-                <option value="">-- Select Area --</option>
-                {activeAreas.map(a => (
-                  <option key={a._id} value={a._id}>
-                    {a.displayName} {a.description ? `(${a.description})` : ''}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </div>
-
-          {/* Validation Feedback Banner */}
-          {selectedLine && (
-            <div
-              className={`p-3 rounded-lg border text-xs flex items-center justify-between ${
-                isOverLimit
-                  ? 'bg-rose-50 border-rose-200 text-rose-800'
-                  : totalReturning > 0
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                  : 'bg-slate-50 border-slate-200 text-slate-600'
-              }`}
-            >
-              <span>
-                Total Returning: <strong>{totalReturning}</strong> unit(s) &bull; Maximum Allowed:{' '}
-                <strong>{remainingReturnable}</strong> unit(s)
-              </span>
-              {isOverLimit && (
-                <span className="font-bold text-rose-600">Exceeds Returnable Limit!</span>
+              {selectedProductId && (
+                <div className="mt-3">
+                  <ProductStockBreakdown productId={selectedProductId} />
+                </div>
               )}
             </div>
-          )}
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-              Reason / Return Notes <span className="text-rose-500">*</span>
-            </label>
-            <textarea
-              rows={3}
-              placeholder="Detailed reason for customer return (required, e.g. Customer ordered incorrect size; damaged during transport)..."
-              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-navy-700 placeholder-slate-400"
-              {...register('reason')}
-            />
-            {errors.reason && (
-              <p className="mt-1 text-xs text-rose-600 font-medium">{errors.reason.message}</p>
-            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Controller
+                  control={control}
+                  name="receivingAreaId"
+                  render={({ field }) => (
+                    <SearchableLocationSelect
+                      id="receivingAreaId"
+                      label="Destination Location"
+                      value={field.value}
+                      onChange={field.onChange}
+                      mode="return"
+                      productId={selectedProductId}
+                      error={errors.receivingAreaId?.message}
+                    />
+                  )}
+                />
+              </div>
+
+              <div>
+                <Input
+                  label="Return Quantity"
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="Qty"
+                  error={errors.quantity?.message}
+                  {...register('quantity')}
+                />
+              </div>
+            </div>
+
+            {/* Condition Selection */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                Condition <span className="text-rose-500">*</span>
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label
+                  className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-colors ${
+                    selectedCondition === 'USABLE'
+                      ? 'border-emerald-500 bg-emerald-50/50 ring-1 ring-emerald-500'
+                      : 'border-slate-200 bg-white hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    value="USABLE"
+                    {...register('condition')}
+                    className="mt-1 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <div>
+                    <span className="block text-sm font-bold text-slate-900">Usable Condition</span>
+                    <span className="block text-xs text-slate-500 mt-0.5">
+                      Restores usable available stock in the destination location.
+                    </span>
+                  </div>
+                </label>
+
+                <label
+                  className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-colors ${
+                    selectedCondition === 'DAMAGED'
+                      ? 'border-rose-500 bg-rose-50/50 ring-1 ring-rose-500'
+                      : 'border-slate-200 bg-white hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    value="DAMAGED"
+                    {...register('condition')}
+                    className="mt-1 text-rose-600 focus:ring-rose-500"
+                  />
+                  <div>
+                    <span className="block text-sm font-bold text-slate-900">Damaged Condition</span>
+                    <span className="block text-xs text-slate-500 mt-0.5">
+                      Allocates to damaged stock. Will NOT increase usable stock.
+                    </span>
+                  </div>
+                </label>
+              </div>
+              {errors.condition && (
+                <p className="mt-1.5 text-xs text-rose-600 font-medium">{errors.condition.message}</p>
+              )}
+            </div>
+
+            {/* Notes / Reason */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                Notes / Reason <span className="text-rose-500">*</span>
+              </label>
+              <textarea
+                rows={3}
+                placeholder="Reason for return, customer feedback, condition inspection notes..."
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-navy-700 placeholder-slate-400"
+                {...register('notes')}
+              />
+              {errors.notes && (
+                <p className="mt-1 text-xs text-rose-600 font-medium">{errors.notes.message}</p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -406,10 +323,9 @@ export const ReturnCreatePage: React.FC = () => {
             type="submit"
             variant="teal"
             isLoading={createMutation.isPending}
-            disabled={!selectedLine || isOverLimit || totalReturning <= 0}
             leftIcon={<RotateCcw className="w-4 h-4" />}
           >
-            Post Customer Return
+            Post Return
           </Button>
         </div>
       </form>

@@ -35,8 +35,8 @@ export const ReturnsListPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Customer Sales Returns"
-        subtitle="Manage returned stock. Restores available stock or places damaged units into separate damaged inventory."
+        title="Product Returns"
+        subtitle="Manage product returns. Usable returns restore available stock; damaged returns allocate into damaged inventory."
         action={
           <Button
             size="sm"
@@ -44,7 +44,7 @@ export const ReturnsListPage: React.FC = () => {
             leftIcon={<Plus className="w-4 h-4" />}
             onClick={() => navigate('/returns/new')}
           >
-            Record Customer Return
+            Record Return
           </Button>
         }
       />
@@ -115,11 +115,11 @@ export const ReturnsListPage: React.FC = () => {
       {/* Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         {isLoading ? (
-          <TableSkeleton rows={6} cols={7} />
+          <TableSkeleton rows={6} cols={8} />
         ) : returns.length === 0 ? (
           <div className="p-12 text-center">
             <RotateCcw className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <h4 className="text-base font-bold text-slate-700">No customer returns found</h4>
+            <h4 className="text-base font-bold text-slate-700">No returns found</h4>
             <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 mb-4">
               Returns restore available stock or allocate defective items into damaged inventory.
             </p>
@@ -132,60 +132,76 @@ export const ReturnsListPage: React.FC = () => {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                  <th className="py-3.5 px-6">Return Reference</th>
                   <th className="py-3.5 px-6">Return Date</th>
-                  <th className="py-3.5 px-6">Sale Reference</th>
                   <th className="py-3.5 px-6">Product</th>
-                  <th className="py-3.5 px-6">Receiving Area</th>
-                  <th className="py-3.5 px-6 text-right">Non-Damaged</th>
-                  <th className="py-3.5 px-6 text-right">Damaged</th>
-                  <th className="py-3.5 px-6">Status</th>
+                  <th className="py-3.5 px-6">Location</th>
+                  <th className="py-3.5 px-6 text-right">Quantity</th>
+                  <th className="py-3.5 px-6 text-center">Condition</th>
+                  <th className="py-3.5 px-6">Notes</th>
+                  <th className="py-3.5 px-6 text-center">Status</th>
                   <th className="py-3.5 px-6 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
-                {returns.map(r => (
-                  <tr key={r._id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-3.5 px-6 font-mono font-bold text-navy-950">
-                      {r.reference}
-                    </td>
-                    <td className="py-3.5 px-6 text-slate-600 text-xs font-mono">
-                      {formatDate(r.returnDate)}
-                    </td>
-                    <td className="py-3.5 px-6 font-mono font-medium text-slate-800 text-xs">
-                      {r.saleId?.reference || '-'}
-                    </td>
-                    <td className="py-3.5 px-6 text-slate-800 text-xs">
-                      <span className="font-semibold block">{r.productId?.name}</span>
-                      <span className="font-mono text-[11px] text-slate-400">{r.productId?.code}</span>
-                    </td>
-                    <td className="py-3.5 px-6 text-xs font-semibold text-navy-900">
-                      {r.receivingAreaId?.displayName || 'Area'}
-                    </td>
-                    <td className="py-3.5 px-6 text-right font-mono font-bold text-emerald-700">
-                      {r.nonDamagedQuantity > 0 ? `+${r.nonDamagedQuantity}` : '-'}
-                    </td>
-                    <td className="py-3.5 px-6 text-right font-mono font-bold text-rose-600">
-                      {r.damagedQuantity > 0 ? `+${r.damagedQuantity}` : '-'}
-                    </td>
-                    <td className="py-3.5 px-6">
-                      <Badge variant={r.status === 'POSTED' ? 'posted' : 'cancelled'}>
-                        {r.status}
-                      </Badge>
-                    </td>
-                    <td className="py-3.5 px-6 text-right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => navigate(`/returns/${r._id}`)}
-                        leftIcon={<Eye className="w-3.5 h-3.5 text-teal-600" />}
-                        className="text-xs"
-                      >
-                        Details
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                {returns.map(r => {
+                  const totalQty = (r.nonDamagedQuantity || 0) + (r.damagedQuantity || 0);
+                  const condition = r.condition || (r.damagedQuantity > 0 ? 'DAMAGED' : 'USABLE');
+                  const locationName = r.receivingAreaId?.displayName || r.receivingAreaId?.name || 'Location';
+                  const notes = r.reason || (r as any).notes || '—';
+
+                  return (
+                    <tr key={r._id} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-3.5 px-6 text-slate-700 text-xs font-mono">
+                        <div>
+                          <span className="font-semibold">{formatDate(r.returnDate)}</span>
+                          <span className="block text-[11px] text-slate-400 font-mono">{r.reference}</span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-6 text-slate-800 text-xs">
+                        <span className="font-semibold block">{r.productId?.name}</span>
+                        {r.saleId?.reference && (
+                          <span className="text-[11px] text-slate-400">Sale: {r.saleId.reference}</span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-6 text-xs font-medium text-slate-800">
+                        {locationName}
+                      </td>
+                      <td className="py-3.5 px-6 text-right font-mono font-bold text-navy-950">
+                        {totalQty.toLocaleString()}
+                      </td>
+                      <td className="py-3.5 px-6 text-center">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
+                            condition === 'USABLE'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-rose-50 text-rose-700 border border-rose-200'
+                          }`}
+                        >
+                          {condition}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-6 text-xs text-slate-600 max-w-xs truncate" title={notes}>
+                        {notes}
+                      </td>
+                      <td className="py-3.5 px-6 text-center">
+                        <Badge variant={r.status === 'POSTED' ? 'posted' : 'cancelled'}>
+                          {r.status}
+                        </Badge>
+                      </td>
+                      <td className="py-3.5 px-6 text-right">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => navigate(`/returns/${r._id}`)}
+                          leftIcon={<Eye className="w-3.5 h-3.5 text-teal-600" />}
+                          className="text-xs"
+                        >
+                          Details
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -204,4 +220,3 @@ export const ReturnsListPage: React.FC = () => {
     </div>
   );
 };
-

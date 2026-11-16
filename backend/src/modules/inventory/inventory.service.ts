@@ -276,21 +276,64 @@ export class InventoryService {
   static async getBalancesForProduct(productId: mongoose.Types.ObjectId | string) {
     const pId = new mongoose.Types.ObjectId(productId);
     const balances = await InventoryBalance.find({ productId: pId })
-      .populate('areaId', 'areaNumber description isActive')
+      .populate({
+        path: 'areaId',
+        select: 'name areaNumber description isActive sectionId',
+        populate: { path: 'sectionId', select: 'name' },
+      })
       .lean();
 
-    // Sort numerically by areaNumber
+    // Sort by location name naturally
     balances.sort((a: any, b: any) => {
-      const numA = a.areaId?.areaNumber ?? 999999;
-      const numB = b.areaId?.areaNumber ?? 999999;
-      return numA - numB;
+      const nameA = a.areaId?.name || (a.areaId?.areaNumber ? `Location ${a.areaId.areaNumber}` : '');
+      const nameB = b.areaId?.name || (b.areaId?.areaNumber ? `Location ${b.areaId.areaNumber}` : '');
+      return nameA.localeCompare(nameB);
     });
 
     const totalAvailable = balances.reduce((sum, b) => sum + (b.availableQuantity || 0), 0);
     const totalDamaged = balances.reduce((sum, b) => sum + (b.damagedQuantity || 0), 0);
 
+    const enrichedBalances = balances.map((b: any) => {
+      const area = b.areaId;
+      let locationName = 'Location unavailable';
+      let locationId = undefined;
+
+      if (area && typeof area === 'object') {
+        locationId = area._id ? area._id.toString() : undefined;
+        const section = area.sectionId;
+        const hasSection = section && typeof section === 'object' && Boolean(section.name);
+        const baseName = area.name || (area.areaNumber ? `Location ${area.areaNumber}` : undefined);
+        if (baseName) {
+          locationName = hasSection && !baseName.toLowerCase().includes(section.name.toLowerCase())
+            ? `${section.name} — ${baseName}`
+            : baseName;
+        } else {
+          locationName = hasSection ? `${section.name} — Unnamed Location` : 'Unnamed Location';
+        }
+      } else if (b.areaId) {
+        locationId = b.areaId.toString();
+        locationName = 'Location unavailable';
+      }
+
+      return {
+        ...b,
+        locationId,
+        locationName,
+        availableQuantity: b.availableQuantity ?? 0,
+        damagedQuantity: b.damagedQuantity ?? 0,
+        areaId:
+          area && typeof area === 'object'
+            ? {
+                ...area,
+                displayName: locationName,
+                name: area.name || locationName,
+              }
+            : b.areaId,
+      };
+    });
+
     return {
-      balances,
+      balances: enrichedBalances,
       totalAvailable,
       totalDamaged,
     };

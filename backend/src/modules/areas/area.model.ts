@@ -26,8 +26,6 @@ const AreaSchema = new Schema<IArea>(
     },
     areaNumber: {
       type: Number,
-      sparse: true,
-      index: true,
     },
     description: {
       type: String,

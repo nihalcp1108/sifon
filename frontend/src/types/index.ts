@@ -1,8 +1,12 @@
 export interface User {
   id: string;
+  _id?: string;
   email: string;
-  name: string;
-  role: 'admin';
+  name?: string;
+  role: 'admin' | 'PRODUCT_VIEWER';
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Brand {
@@ -48,6 +52,9 @@ export interface Area {
   createdAt: string;
   updatedAt: string;
 }
+
+export type Location = Area;
+export type LocationBalance = AreaBalance;
 
 export interface AreaBalance {
   _id: string;
@@ -166,12 +173,13 @@ export interface ReturnRecord {
   _id: string;
   reference: string;
   returnDate: string;
-  saleId: { _id: string; reference: string; saleDate: string; items?: SaleItem[] };
-  saleLineId: string;
+  saleId?: { _id: string; reference: string; saleDate: string; items?: SaleItem[] };
+  saleLineId?: string;
   productId: Product;
   receivingAreaId: Area;
   nonDamagedQuantity: number;
   damagedQuantity: number;
+  condition?: 'USABLE' | 'DAMAGED';
   reason: string;
   status: 'POSTED' | 'CANCELLED';
   cancellationReason?: string;

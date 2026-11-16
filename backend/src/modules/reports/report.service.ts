@@ -354,7 +354,7 @@ export class ReportService {
       'Brand',
       'Category',
       'Product Name',
-      'Area',
+      'Location',
       'Opening Available',
       'Opening Stock Added',
       'Purchased',

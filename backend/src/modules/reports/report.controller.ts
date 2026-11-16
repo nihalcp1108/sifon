@@ -17,7 +17,7 @@ export class ReportController {
     try {
       const csv = await ReportService.exportStockMatrixCsv(req.query as any);
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', 'attachment; filename="sifon-stock-matrix.csv"');
+      res.setHeader('Content-Disposition', 'attachment; filename="s-and-m-stock-matrix.csv"');
       return res.status(200).send(csv);
     } catch (error) {
       next(error);
@@ -37,7 +37,7 @@ export class ReportController {
     try {
       const csv = await ReportService.exportPeriodStatementCsv(req.query as any);
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', 'attachment; filename="sifon-period-statement.csv"');
+      res.setHeader('Content-Disposition', 'attachment; filename="s-and-m-period-statement.csv"');
       return res.status(200).send(csv);
     } catch (error) {
       next(error);

@@ -15,14 +15,23 @@ export const createReturnSchema = z
   .object({
     reference: optionalReferenceSchema,
     returnDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
-    saleId: z.string().trim().min(1, 'Sale ID is required'),
-    saleLineId: z.string().trim().min(1, 'Sale line item ID is required'),
+    productId: z.string().trim().regex(/^[0-9a-fA-F]{24}$/, 'Invalid Product ID format').optional(),
     receivingAreaId: z
       .string()
       .trim()
+      .regex(/^[0-9a-fA-F]{24}$/, 'Invalid Location ID format')
       .optional()
       .nullable()
       .transform(val => (val && val.length > 0 ? val : undefined)),
+    quantity: z.coerce
+      .number({ invalid_type_error: 'Quantity must be a valid number' })
+      .int('Quantity must be an integer')
+      .positive('Quantity must be greater than zero')
+      .optional(),
+    condition: z.enum(['USABLE', 'DAMAGED', 'Usable', 'Damaged']).optional(),
+    notes: z.string().trim().max(1000).optional(),
+    saleId: z.string().trim().optional(),
+    saleLineId: z.string().trim().optional(),
     nonDamagedQuantity: z.coerce
       .number({ invalid_type_error: 'Non-damaged quantity must be a valid number' })
       .int('Non-damaged quantity must be an integer')
@@ -33,12 +42,23 @@ export const createReturnSchema = z
       .int('Damaged quantity must be an integer')
       .min(0, 'Damaged quantity cannot be negative')
       .default(0),
-    reason: z.string().trim().min(3, 'Reason is required (min 3 chars)').max(500),
+    reason: z.string().trim().max(500).optional(),
   })
-  .refine(data => data.nonDamagedQuantity > 0 || data.damagedQuantity > 0, {
-    message: 'At least one of non-damaged or damaged quantity must be greater than zero',
-    path: ['nonDamagedQuantity'],
-  });
+  .refine(
+    data => {
+      if (data.productId) {
+        return Boolean(data.quantity && data.quantity > 0 && data.receivingAreaId);
+      }
+      if (data.saleId && data.saleLineId) {
+        return data.nonDamagedQuantity > 0 || data.damagedQuantity > 0 || (data.quantity && data.quantity > 0);
+      }
+      return false;
+    },
+    {
+      message: 'Please provide Product, Location, and Quantity',
+      path: ['productId'],
+    }
+  );
 
 export const cancelReturnSchema = z.object({
   reason: z.string().trim().min(3, 'Cancellation reason is required (min 3 chars)').max(500),

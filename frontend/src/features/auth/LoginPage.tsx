@@ -50,14 +50,15 @@ export const LoginPage: React.FC = () => {
   }
 
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={user.role === 'PRODUCT_VIEWER' ? '/products' : '/brands'} replace />;
   }
 
   const onSubmit = async (data: LoginFormData) => {
     try {
       setServerError(null);
-      await login(data.email, data.password);
-      navigate('/dashboard', { replace: true });
+      const res = await login(data.email, data.password);
+      const targetRole = res?.user?.role || (res as any)?.role;
+      navigate(targetRole === 'PRODUCT_VIEWER' ? '/products' : '/brands', { replace: true });
     } catch (err: any) {
       setServerError(err.message || 'Invalid email or password');
     }
@@ -70,13 +71,13 @@ export const LoginPage: React.FC = () => {
           <div className="w-11 h-11 rounded-xl bg-navy-900 flex items-center justify-center shadow-lg shadow-navy-900/20 text-white">
             <Layers className="w-6 h-6 text-teal-400" />
           </div>
-          <span className="text-3xl font-extrabold tracking-tight text-navy-900">Sifon</span>
+          <span className="text-3xl font-extrabold tracking-tight text-navy-900">S AND M</span>
         </div>
         <h2 className="mt-4 text-center text-xl font-bold tracking-tight text-slate-800">
           Stock Management Portal
         </h2>
         <p className="mt-1 text-center text-xs text-slate-500">
-          Enter your administrator credentials to access inventory
+          Enter your credentials to access inventory
         </p>
       </div>
 
@@ -108,7 +109,7 @@ export const LoginPage: React.FC = () => {
                 <input
                   type="email"
                   autoComplete="email"
-                  placeholder="admin@sifon.local"
+                  placeholder="admin@example.com"
                   className="block w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-navy-700"
                   {...register('email')}
                 />
@@ -146,14 +147,14 @@ export const LoginPage: React.FC = () => {
                 className="w-full py-2.5 bg-navy-900 hover:bg-navy-800 shadow-md shadow-navy-900/10"
                 isLoading={isSubmitting}
               >
-                Sign In to Sifon
+                Sign In to S AND M
               </Button>
             </div>
           </form>
         </div>
 
         <div className="mt-6 text-center text-xs text-slate-400">
-          Sifon Inventory & Stock Management System &bull; Version 1.0
+          S AND M Inventory & Stock Management System &bull; Version 1.0
         </div>
       </div>
     </div>

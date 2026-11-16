@@ -6,17 +6,18 @@ import {
 } from '../../utils/query-validation.js';
 
 export const createAreaSchema = z.object({
-  name: z.string({ required_error: 'Area name is required' }).trim().min(1, 'Area name cannot be empty').max(100),
+  name: z.string({ required_error: 'Location is required' }).trim().min(1, 'Location cannot be empty').max(100),
   sectionId: z
-    .string({ required_error: 'Section is required' })
+    .string()
     .trim()
-    .regex(/^[0-9a-fA-F]{24}$/, 'Invalid Section ID format'),
+    .regex(/^[0-9a-fA-F]{24}$/, 'Invalid Section ID format')
+    .optional(),
   description: z.string().trim().max(500).optional(),
   areaNumber: z.number().int().positive().optional(),
 });
 
 export const updateAreaSchema = z.object({
-  name: z.string().trim().min(1, 'Area name cannot be empty').max(100).optional(),
+  name: z.string().trim().min(1, 'Location cannot be empty').max(100).optional(),
   sectionId: z
     .string()
     .trim()

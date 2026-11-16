@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { Return, IReturn } from './return.model.js';
 import { Sale } from '../sales/sale.model.js';
+import { Product } from '../products/product.model.js';
 import { Area } from '../areas/area.model.js';
 import { InventoryService } from '../inventory/inventory.service.js';
 import { CreateReturnInput, CancelReturnInput, ReturnQueryInput } from './return.validation.js';
@@ -19,46 +20,93 @@ export class ReturnService {
   static async createReturn(input: CreateReturnInput, userId: string): Promise<IReturn> {
     const businessDate = parseDateStartInclusive(input.returnDate);
     const reference = input.reference?.trim() || (await this.generateReference(input.returnDate));
-    const totalReturnQty = input.nonDamagedQuantity + input.damagedQuantity;
 
+    // Determine quantities
+    let nonDamagedQty = input.nonDamagedQuantity || 0;
+    let damagedQty = input.damagedQuantity || 0;
+
+    if (input.quantity && input.quantity > 0) {
+      const cond = (input.condition || 'USABLE').toUpperCase();
+      if (cond === 'DAMAGED') {
+        damagedQty = input.quantity;
+        nonDamagedQty = 0;
+      } else {
+        nonDamagedQty = input.quantity;
+        damagedQty = 0;
+      }
+    }
+
+    const totalReturnQty = nonDamagedQty + damagedQty;
     if (totalReturnQty <= 0) {
       throw new BadRequestError('Total return quantity must be greater than zero');
     }
 
     return await runInTransaction(async session => {
-      // Find sale inside transaction with primary read
-      const sale = await Sale.findById(input.saleId).session(session);
-      if (!sale) {
-        throw new NotFoundError('Original sale not found');
-      }
-      if (sale.status !== 'POSTED') {
-        throw new BadRequestError(`Cannot return against sale with status: ${sale.status}. Only posted sales can be returned.`);
+      let targetProductId: mongoose.Types.ObjectId;
+      let receivingAreaId = input.receivingAreaId;
+      let sale: any = null;
+      let saleLine: any = null;
+
+      if (input.saleId && input.saleLineId) {
+        // Legacy sale-linked return flow
+        sale = await Sale.findById(input.saleId).session(session);
+        if (!sale) {
+          throw new NotFoundError('Original sale not found');
+        }
+        if (sale.status !== 'POSTED') {
+          throw new BadRequestError(`Cannot return against sale with status: ${sale.status}. Only posted sales can be returned.`);
+        }
+
+        saleLine = sale.items.find((i: any) => i._id.toString() === input.saleLineId);
+        if (!saleLine) {
+          throw new NotFoundError(`Sale line item not found: ${input.saleLineId}`);
+        }
+
+        const currentReturned = saleLine.returnedQuantity || 0;
+        const remainingReturnable = saleLine.quantity - currentReturned;
+
+        if (totalReturnQty > remainingReturnable) {
+          throw new BadRequestError(
+            `Requested return quantity (${totalReturnQty}) exceeds remaining returnable quantity (${remainingReturnable}). ` +
+            `Original sold: ${saleLine.quantity}, already returned: ${currentReturned}.`
+          );
+        }
+
+        targetProductId = saleLine.productId;
+        receivingAreaId = receivingAreaId || saleLine.sourceAreaId.toString();
+
+        // Increment returnedQuantity on sale line atomically
+        saleLine.returnedQuantity = currentReturned + totalReturnQty;
+        await sale.save({ session });
+      } else if (input.productId) {
+        // Product-based return flow
+        if (!mongoose.Types.ObjectId.isValid(input.productId)) {
+          throw new BadRequestError('Invalid Product ID');
+        }
+        const prod = await Product.findById(input.productId).session(session);
+        if (!prod) {
+          throw new NotFoundError('Product not found');
+        }
+        targetProductId = prod._id;
+      } else {
+        throw new BadRequestError('Either product or original sale must be specified');
       }
 
-      const saleLine = sale.items.find(i => i._id.toString() === input.saleLineId);
-      if (!saleLine) {
-        throw new NotFoundError(`Sale line item not found: ${input.saleLineId}`);
+      if (!receivingAreaId || !mongoose.Types.ObjectId.isValid(receivingAreaId)) {
+        throw new BadRequestError('Valid destination location is required');
       }
 
-      const currentReturned = saleLine.returnedQuantity || 0;
-      const remainingReturnable = saleLine.quantity - currentReturned;
-
-      if (totalReturnQty > remainingReturnable) {
-        throw new BadRequestError(
-          `Requested return quantity (${totalReturnQty}) exceeds remaining returnable quantity (${remainingReturnable}). ` +
-          `Original sold: ${saleLine.quantity}, already returned: ${currentReturned}.`
-        );
-      }
-
-      // Default receiving area to original sale line source area if not specified
-      const receivingAreaId = input.receivingAreaId || saleLine.sourceAreaId.toString();
       const receivingArea = await Area.findById(receivingAreaId).session(session);
       if (!receivingArea) {
-        throw new NotFoundError(`Receiving area not found: ${receivingAreaId}`);
+        throw new NotFoundError(`Destination location not found: ${receivingAreaId}`);
       }
       if (!receivingArea.isActive) {
-        throw new BadRequestError(`Cannot return into inactive Area ${receivingArea.areaNumber}`);
+        const label = receivingArea.displayName || receivingArea.name || 'this location';
+        throw new BadRequestError(`Cannot return into inactive location: ${label}`);
       }
+
+      const reasonText = input.notes?.trim() || input.reason?.trim() || 'Product return';
+      const cond = damagedQty > 0 ? 'DAMAGED' : 'USABLE';
 
       // Create return document
       const [returnDoc] = await Return.create(
@@ -66,13 +114,14 @@ export class ReturnService {
           {
             reference,
             returnDate: businessDate,
-            saleId: sale._id,
-            saleLineId: saleLine._id,
-            productId: saleLine.productId,
+            saleId: sale ? sale._id : undefined,
+            saleLineId: saleLine ? saleLine._id : undefined,
+            productId: targetProductId,
             receivingAreaId: receivingArea._id,
-            nonDamagedQuantity: input.nonDamagedQuantity,
-            damagedQuantity: input.damagedQuantity,
-            reason: input.reason,
+            nonDamagedQuantity: nonDamagedQty,
+            damagedQuantity: damagedQty,
+            condition: cond,
+            reason: reasonText,
             status: 'POSTED',
             createdBy: new mongoose.Types.ObjectId(userId),
           },
@@ -80,46 +129,41 @@ export class ReturnService {
         { session }
       );
 
-      // Increment returnedQuantity on sale line atomically
-      saleLine.returnedQuantity = currentReturned + totalReturnQty;
-      await sale.save({ session });
-
       // Apply stock movements:
-      // Non-damaged return increases available stock
-      if (input.nonDamagedQuantity > 0) {
+      // Usable (non-damaged) return increases available stock
+      if (nonDamagedQty > 0) {
         await InventoryService.adjustStock(
           {
-            productId: saleLine.productId,
+            productId: targetProductId,
             areaId: receivingArea._id,
-            availableDelta: input.nonDamagedQuantity,
+            availableDelta: nonDamagedQty,
             movementType: 'RETURN_AVAILABLE',
             sourceDocumentType: 'RETURN',
             sourceDocumentId: returnDoc._id,
-            sourceDocumentLineId: saleLine._id,
+            sourceDocumentLineId: saleLine ? saleLine._id : undefined,
             businessDate,
             createdBy: userId,
-            reason: input.reason,
+            reason: reasonText,
           },
           session
         );
       }
 
       // Damaged return increases damaged stock ONLY.
-      // Rule: "Never reduce available stock again when recording a damaged sales return; that quantity already left available stock when sold."
-      if (input.damagedQuantity > 0) {
+      if (damagedQty > 0) {
         await InventoryService.adjustStock(
           {
-            productId: saleLine.productId,
+            productId: targetProductId,
             areaId: receivingArea._id,
             availableDelta: 0,
-            damagedDelta: input.damagedQuantity,
+            damagedDelta: damagedQty,
             movementType: 'RETURN_DAMAGED',
             sourceDocumentType: 'RETURN',
             sourceDocumentId: returnDoc._id,
-            sourceDocumentLineId: saleLine._id,
+            sourceDocumentLineId: saleLine ? saleLine._id : undefined,
             businessDate,
             createdBy: userId,
-            reason: input.reason,
+            reason: reasonText,
           },
           session
         );
@@ -143,16 +187,17 @@ export class ReturnService {
         throw new BadRequestError(`Only posted returns can be cancelled. Current status: ${returnDoc.status}`);
       }
 
-      const sale = await Sale.findById(returnDoc.saleId).session(session);
-      if (!sale) {
-        throw new NotFoundError('Original sale record not found');
-      }
-
-      const saleLine = sale.items.find(i => i._id.toString() === returnDoc.saleLineId.toString());
-      if (saleLine) {
-        const totalReturnQty = returnDoc.nonDamagedQuantity + returnDoc.damagedQuantity;
-        saleLine.returnedQuantity = Math.max(0, (saleLine.returnedQuantity || 0) - totalReturnQty);
-        await sale.save({ session });
+      // If return was linked to a sale, restore saleLine returnedQuantity
+      if (returnDoc.saleId && returnDoc.saleLineId) {
+        const sale = await Sale.findById(returnDoc.saleId).session(session);
+        if (sale) {
+          const saleLine = sale.items.find((i: any) => i._id.toString() === returnDoc.saleLineId?.toString());
+          if (saleLine) {
+            const totalReturnQty = returnDoc.nonDamagedQuantity + returnDoc.damagedQuantity;
+            saleLine.returnedQuantity = Math.max(0, (saleLine.returnedQuantity || 0) - totalReturnQty);
+            await sale.save({ session });
+          }
+        }
       }
 
       // Reverse non-damaged return: reduces available stock
@@ -237,7 +282,7 @@ export class ReturnService {
 
     const returns = await Return.find(filter)
       .populate('productId', 'code name unit')
-      .populate('receivingAreaId', 'areaNumber description')
+      .populate('receivingAreaId', 'name areaNumber description sectionId')
       .populate('saleId', 'reference saleDate')
       .populate('createdBy', 'name email')
       .sort({ returnDate: -1, createdAt: -1 })
@@ -245,8 +290,17 @@ export class ReturnService {
       .limit(limit)
       .lean();
 
+    const enrichedReturns = returns.map((r: any) => {
+      const area = r.receivingAreaId;
+      if (area && typeof area === 'object') {
+        const areaName = area.name || (area.areaNumber ? `Area ${area.areaNumber}` : 'Location');
+        area.displayName = area.displayName || areaName;
+      }
+      return r;
+    });
+
     return {
-      returns,
+      returns: enrichedReturns,
       meta: {
         page,
         limit,
@@ -257,9 +311,9 @@ export class ReturnService {
   }
 
   static async getReturnById(id: string): Promise<IReturn> {
-    const returnDoc = await Return.findById(id)
+    const returnDoc: any = await Return.findById(id)
       .populate('productId', 'code name unit')
-      .populate('receivingAreaId', 'areaNumber description')
+      .populate('receivingAreaId', 'name areaNumber description sectionId')
       .populate('saleId', 'reference saleDate items')
       .populate('createdBy', 'name email')
       .populate('cancelledBy', 'name email')
@@ -267,6 +321,11 @@ export class ReturnService {
 
     if (!returnDoc) {
       throw new NotFoundError('Return not found');
+    }
+
+    if (returnDoc.receivingAreaId && typeof returnDoc.receivingAreaId === 'object') {
+      const areaName = returnDoc.receivingAreaId.name || (returnDoc.receivingAreaId.areaNumber ? `Area ${returnDoc.receivingAreaId.areaNumber}` : 'Location');
+      returnDoc.receivingAreaId.displayName = returnDoc.receivingAreaId.displayName || areaName;
     }
 
     return returnDoc as any;

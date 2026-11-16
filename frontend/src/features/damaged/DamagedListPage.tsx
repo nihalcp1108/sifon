@@ -136,7 +136,7 @@ export const DamagedListPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-slate-500 uppercase tracking-wider">Area:</span>
+            <span className="font-semibold text-slate-500 uppercase tracking-wider">Location:</span>
             <select
               value={areaId}
               onChange={e => {
@@ -145,10 +145,10 @@ export const DamagedListPage: React.FC = () => {
               }}
               className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-navy-700"
             >
-              <option value="">All Areas</option>
+              <option value="">All Locations</option>
               {areas.map(a => (
                 <option key={a._id} value={a._id}>
-                  {a.displayName}
+                  {a.displayName || a.name}
                 </option>
               ))}
             </select>
@@ -213,7 +213,7 @@ export const DamagedListPage: React.FC = () => {
               <AlertTriangle className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
               <h4 className="text-base font-bold text-slate-700">Zero damaged inventory</h4>
               <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
-                There are currently no damaged stock units recorded across any areas.
+                There are currently no damaged stock units recorded across any locations.
               </p>
             </div>
           ) : (
@@ -222,7 +222,7 @@ export const DamagedListPage: React.FC = () => {
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
                     <th className="py-3.5 px-6">Product Name</th>
-                    <th className="py-3.5 px-6">Storage Area</th>
+                    <th className="py-3.5 px-6">Storage Location</th>
                     <th className="py-3.5 px-6 text-right">Damaged Quantity</th>
                   </tr>
                 </thead>
@@ -232,8 +232,8 @@ export const DamagedListPage: React.FC = () => {
                       <td className="py-3.5 px-6 font-medium text-slate-900">
                         {b.productId?.name}
                       </td>
-                      <td className="py-3.5 px-6 font-semibold text-navy-900">
-                        {b.areaId?.displayName || 'Area'}
+                      <td className="py-3.5 px-6 font-semibold text-navy-950">
+                        {b.areaId?.displayName || b.areaId?.name || 'Location'}
                       </td>
                       <td className="py-3.5 px-6 text-right font-mono font-bold text-rose-600">
                         {b.damagedQuantity.toLocaleString()} {b.productId?.unit || 'pcs'}
@@ -265,7 +265,7 @@ export const DamagedListPage: React.FC = () => {
                     <th className="py-3.5 px-6">Return Date</th>
                     <th className="py-3.5 px-6">Original Sale</th>
                     <th className="py-3.5 px-6">Product</th>
-                    <th className="py-3.5 px-6">Area</th>
+                    <th className="py-3.5 px-6">Location</th>
                     <th className="py-3.5 px-6 text-right">Damaged Qty</th>
                     <th className="py-3.5 px-6">Reason / Defect Description</th>
                   </tr>
@@ -285,8 +285,8 @@ export const DamagedListPage: React.FC = () => {
                       <td className="py-3.5 px-6 font-medium text-slate-900">
                         {r.productId?.name}
                       </td>
-                      <td className="py-3.5 px-6 font-semibold text-navy-900">
-                        {r.receivingAreaId?.displayName}
+                      <td className="py-3.5 px-6 font-semibold text-navy-950">
+                        {r.receivingAreaId?.displayName || r.receivingAreaId?.name || 'Location'}
                       </td>
                       <td className="py-3.5 px-6 text-right font-mono font-bold text-rose-600">
                         +{r.damagedQuantity} {r.productId?.unit || 'pcs'}

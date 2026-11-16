@@ -6,12 +6,13 @@ export interface IReturn extends Document {
   _id: mongoose.Types.ObjectId;
   reference: string;
   returnDate: Date;
-  saleId: mongoose.Types.ObjectId;
-  saleLineId: mongoose.Types.ObjectId;
+  saleId?: mongoose.Types.ObjectId;
+  saleLineId?: mongoose.Types.ObjectId;
   productId: mongoose.Types.ObjectId;
   receivingAreaId: mongoose.Types.ObjectId;
   nonDamagedQuantity: number;
   damagedQuantity: number;
+  condition?: 'USABLE' | 'DAMAGED';
   reason: string;
   status: ReturnStatus;
   cancellationReason?: string;
@@ -40,12 +41,13 @@ const ReturnSchema = new Schema<IReturn>(
     saleId: {
       type: Schema.Types.ObjectId,
       ref: 'Sale',
-      required: true,
+      required: false,
+      sparse: true,
       index: true,
     },
     saleLineId: {
       type: Schema.Types.ObjectId,
-      required: true,
+      required: false,
     },
     productId: {
       type: Schema.Types.ObjectId,
@@ -58,6 +60,10 @@ const ReturnSchema = new Schema<IReturn>(
       ref: 'Area',
       required: true,
       index: true,
+    },
+    condition: {
+      type: String,
+      enum: ['USABLE', 'DAMAGED'],
     },
     nonDamagedQuantity: {
       type: Number,

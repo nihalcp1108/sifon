@@ -8,7 +8,7 @@ import {
   areaOptionsQuerySchema,
 } from './area.validation.js';
 import { objectIdParamSchema } from '../../utils/query-validation.js';
-import { requireAuth } from '../../middleware/auth.js';
+import { requireAuth, requireAdmin } from '../../middleware/auth.js';
 
 const router = Router();
 
@@ -27,7 +27,7 @@ router.get(
   AreaController.getAreaOptions
 );
 
-router.post('/', validateRequest({ body: createAreaSchema }), AreaController.createArea);
+router.post('/', requireAdmin, validateRequest({ body: createAreaSchema }), AreaController.createArea);
 router.get('/', validateRequest({ query: areaQuerySchema }), AreaController.getAreas);
 
 // Dynamic :id detail routes - strictly scoped with ObjectId parameter validation
@@ -39,12 +39,14 @@ router.get(
 
 router.put(
   '/:id',
+  requireAdmin,
   validateRequest({ params: objectIdParamSchema, body: updateAreaSchema }),
   AreaController.updateArea
 );
 
 router.delete(
   '/:id',
+  requireAdmin,
   validateRequest({ params: objectIdParamSchema }),
   AreaController.deleteArea
 );

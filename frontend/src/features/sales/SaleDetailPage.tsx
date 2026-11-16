@@ -233,7 +233,7 @@ export const SaleDetailPage: React.FC = () => {
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase">
                   <th className="py-2.5 px-4">Line #</th>
                   <th className="py-2.5 px-4">Product</th>
-                  <th className="py-2.5 px-4">Source Area</th>
+                  <th className="py-2.5 px-4">Source Location</th>
                   <th className="py-2.5 px-4 text-right">Quantity Sold</th>
                   <th className="py-2.5 px-4 text-right">Active Returned</th>
                   <th className="py-2.5 px-4 text-right">Remaining Returnable</th>
@@ -254,7 +254,7 @@ export const SaleDetailPage: React.FC = () => {
                       </td>
                       <td className="py-3 px-4">
                         <span className="font-semibold text-navy-950">
-                          {item.sourceAreaId?.displayName || 'Area'}
+                          {item.sourceAreaId?.displayName || 'Location'}
                         </span>
                         {item.sourceAreaId?.description && (
                           <span className="block text-[11px] text-slate-400">
@@ -288,7 +288,7 @@ export const SaleDetailPage: React.FC = () => {
         message={
           hasActiveReturns
             ? 'CANNOT CANCEL: Active customer returns currently exist against this sale. In accordance with inventory integrity rules, all associated customer returns must be reversed before this sale can be cancelled.'
-            : 'Are you sure you want to cancel this sale? Reversing this sale will restore the deducted stock back to the original source areas.'
+            : 'Are you sure you want to cancel this sale? Reversing this sale will restore the deducted stock back to the original source locations.'
         }
         confirmText={hasActiveReturns ? 'Cancellation Blocked' : 'Cancel Sale & Restore Stock'}
         variant="danger"

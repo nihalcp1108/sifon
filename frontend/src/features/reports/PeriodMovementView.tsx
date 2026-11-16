@@ -17,7 +17,7 @@ export const PeriodMovementView: React.FC<{ data: PeriodStatementData }> = ({ da
       <table className="w-full text-left border-collapse text-xs border border-slate-200">
         <thead>
           <tr className="bg-navy-950 text-white uppercase text-[10px] font-bold">
-            <th className="py-3 px-3 border-r border-navy-800">Product / Area</th>
+            <th className="py-3 px-3 border-r border-navy-800">Product / Location</th>
             <th className="py-3 px-3 text-right border-r border-navy-800 bg-slate-900">
               Opening Available
             </th>

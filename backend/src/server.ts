@@ -17,6 +17,23 @@ async function bootstrap() {
     // 2. Connect to MongoDB Atlas (or configured replica set)
     await connectDatabase();
 
+    // Auto-migration: ensure obsolete areaNumber unique index is dropped safely
+    try {
+      const db = (await import('mongoose')).default.connection.db;
+      if (db) {
+        const areaIndexes = await db.collection('areas').indexes();
+        const obsoleteIndex = areaIndexes.find(
+          (i: any) => i.name === 'areaNumber_1' || (i.key && i.key.areaNumber && i.unique)
+        );
+        if (obsoleteIndex && obsoleteIndex.name) {
+          await db.collection('areas').dropIndex(obsoleteIndex.name);
+          console.log(`[Bootstrap] Dropped obsolete index "${obsoleteIndex.name}" from areas collection.`);
+        }
+      }
+    } catch (migErr) {
+      console.warn('[Bootstrap] Note on areaNumber index cleanup:', (migErr as any)?.message);
+    }
+
     // 3. Auto-create initial admin if requested in environment
     if (env.INITIAL_ADMIN_EMAIL && env.INITIAL_ADMIN_PASSWORD) {
       try {

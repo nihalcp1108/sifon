@@ -30,7 +30,7 @@ export class DamagedService {
 
     const balances = await InventoryBalance.find(query)
       .populate('productId', 'code name unit')
-      .populate('areaId', 'areaNumber description')
+      .populate('areaId', 'name areaNumber description')
       .lean();
 
     balances.sort((a: any, b: any) => {
@@ -77,7 +77,7 @@ export class DamagedService {
 
     const returns = await Return.find(query)
       .populate('productId', 'code name unit')
-      .populate('receivingAreaId', 'areaNumber description')
+      .populate('receivingAreaId', 'name areaNumber description')
       .populate('saleId', 'reference saleDate')
       .populate('createdBy', 'name email')
       .populate('cancelledBy', 'name email')

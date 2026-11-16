@@ -35,4 +35,39 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type ChangeEmailInput = z.infer<typeof changeEmailSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
+export const createProductViewerSchema = z.object({
+  email: z.string().trim().toLowerCase().email('Please provide a valid email address'),
+  password: z
+    .string()
+    .min(6, 'Password must be at least 6 characters')
+    .refine((val) => Buffer.byteLength(val, 'utf8') <= 72, 'Password cannot exceed 72 bytes'),
+});
+
+export const resetUserPasswordSchema = z
+  .object({
+    password: z
+      .string()
+      .min(6, 'Password must be at least 6 characters')
+      .refine((val) => Buffer.byteLength(val, 'utf8') <= 72, 'Password cannot exceed 72 bytes')
+      .optional(),
+    newPassword: z
+      .string()
+      .min(6, 'Password must be at least 6 characters')
+      .refine((val) => Buffer.byteLength(val, 'utf8') <= 72, 'Password cannot exceed 72 bytes')
+      .optional(),
+  })
+  .refine((data) => data.password || data.newPassword, {
+    message: 'Password is required',
+    path: ['password'],
+  });
+
+export const toggleUserStatusSchema = z.object({
+  isActive: z.boolean(),
+});
+
+export type CreateProductViewerInput = z.infer<typeof createProductViewerSchema>;
+export type ResetUserPasswordInput = z.infer<typeof resetUserPasswordSchema>;
+export type ToggleUserStatusInput = z.infer<typeof toggleUserStatusSchema>;
+
+
 

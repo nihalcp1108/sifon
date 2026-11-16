@@ -105,33 +105,30 @@ describe('Unit Validation Tests', () => {
     expect(() => areaQuerySchema.parse({ limit: '0' })).toThrow(/positive integer/);
   });
 
-  it('Create and Update Area Schemas enforce required names, trimmed strings, and valid sectionIds', () => {
+  it('Create and Update Area/Location Schemas enforce required names and trimmed strings', () => {
     const validCreate = createAreaSchema.parse({
       name: '  Main Storage Bay  ',
-      sectionId: '507f1f77bcf86cd799439011',
       description: 'Primary storage area',
     });
     expect(validCreate.name).toBe('Main Storage Bay');
-    expect(validCreate.sectionId).toBe('507f1f77bcf86cd799439011');
     expect(validCreate.description).toBe('Primary storage area');
 
     // Name cannot be empty or whitespace only
     expect(() =>
       createAreaSchema.parse({
         name: '   ',
-        sectionId: '507f1f77bcf86cd799439011',
       })
-    ).toThrow(/Area name cannot be empty/);
+    ).toThrow(/Location cannot be empty/);
 
-    // Section ID required on create
-    expect(() =>
-      createAreaSchema.parse({
-        name: 'Bay 1',
-        sectionId: '',
-      })
-    ).toThrow(/Invalid Section ID format/);
+    // Section ID is optional for Location
+    const validWithSection = createAreaSchema.parse({
+      name: 'Bay 1',
+      sectionId: '507f1f77bcf86cd799439011',
+    });
+    expect(validWithSection.name).toBe('Bay 1');
+    expect(validWithSection.sectionId).toBe('507f1f77bcf86cd799439011');
 
-    // Update Area schema allows partial fields
+    // Update Area/Location schema allows partial fields
     const validUpdate = updateAreaSchema.parse({
       name: '  Updated Bay Name  ',
       isActive: false,
@@ -311,21 +308,26 @@ describe('Unit Validation Tests', () => {
     expect(() => createSectionSchema.parse({})).toThrow();
   });
 
-  it('Area creation schema requires name and valid sectionId', async () => {
+  it('Location creation schema requires location name and allows standalone creation', async () => {
     const { createAreaSchema } = await import('../src/modules/areas/area.validation.js');
     const validSectionId = '507f1f77bcf86cd799439011';
 
     const validArea = createAreaSchema.parse({
       name: '  Main Store  ',
-      sectionId: validSectionId,
     });
     expect(validArea.name).toBe('Main Store');
-    expect(validArea.sectionId).toBe(validSectionId);
 
-    // Missing sectionId or invalid sectionId throws
-    expect(() => createAreaSchema.parse({ name: 'Main Store' })).toThrow();
+    const withSection = createAreaSchema.parse({
+      name: 'Main Store',
+      sectionId: validSectionId,
+    });
+    expect(withSection.sectionId).toBe(validSectionId);
+
+    // Empty name throws
+    expect(() => createAreaSchema.parse({ name: '' })).toThrow();
+    expect(() => createAreaSchema.parse({ name: '   ' })).toThrow();
+    // Invalid sectionId format throws if provided
     expect(() => createAreaSchema.parse({ name: 'Main Store', sectionId: '123' })).toThrow();
-    expect(() => createAreaSchema.parse({ sectionId: validSectionId })).toThrow();
   });
 
   it('Product creation schema requires brandId and categoryId, but does NOT require code', async () => {
@@ -358,6 +360,135 @@ describe('Unit Validation Tests', () => {
         brandId,
       })
     ).toThrow();
+  });
+
+  it('Product-based return schema validates product, location, quantity, and condition', async () => {
+    const { createReturnSchema } = await import('../src/modules/returns/return.validation.js');
+    const validProdId = '507f1f77bcf86cd799439011';
+    const validLocId = '507f1f77bcf86cd799439022';
+
+    const validReturn = createReturnSchema.parse({
+      returnDate: '2026-11-16',
+      productId: validProdId,
+      receivingAreaId: validLocId,
+      quantity: 5,
+      condition: 'USABLE',
+      notes: 'Customer exchange',
+    });
+    expect(validReturn.productId).toBe(validProdId);
+    expect(validReturn.receivingAreaId).toBe(validLocId);
+    expect(validReturn.quantity).toBe(5);
+    expect(validReturn.condition).toBe('USABLE');
+
+    // Damaged return works
+    const damagedReturn = createReturnSchema.parse({
+      returnDate: '2026-11-16',
+      productId: validProdId,
+      receivingAreaId: validLocId,
+      quantity: 2,
+      condition: 'DAMAGED',
+    });
+    expect(damagedReturn.condition).toBe('DAMAGED');
+
+    // Missing product and sale throws
+    expect(() =>
+      createReturnSchema.parse({
+        returnDate: '2026-11-16',
+        receivingAreaId: validLocId,
+        quantity: 5,
+      })
+    ).toThrow();
+
+    // Zero or negative quantity throws
+    expect(() =>
+      createReturnSchema.parse({
+        returnDate: '2026-11-16',
+        productId: validProdId,
+        receivingAreaId: validLocId,
+        quantity: 0,
+      })
+    ).toThrow();
+  });
+
+  it('Product Viewer account schema enforces ONLY email and min 6-char password without name', async () => {
+    const {
+      createProductViewerSchema,
+      resetUserPasswordSchema,
+      toggleUserStatusSchema,
+    } = await import('../src/modules/auth/auth.validation.js');
+
+    // Valid creation with ONLY email and password
+    const valid = createProductViewerSchema.parse({
+      email: '  EMPLOYEE1@SANDM.LOCAL  ',
+      password: 'secret123',
+    });
+    expect(valid.email).toBe('employee1@sandm.local');
+    expect(valid.password).toBe('secret123');
+    // Ensure no name property exists or is required on parsed data
+    expect((valid as any).name).toBeUndefined();
+
+    // Password under 6 chars fails
+    expect(() =>
+      createProductViewerSchema.parse({
+        email: 'employee2@sandm.local',
+        password: 'short',
+      })
+    ).toThrow(/Password must be at least 6 characters/);
+
+    // Invalid email fails
+    expect(() =>
+      createProductViewerSchema.parse({
+        email: 'not-an-email',
+        password: 'validpassword',
+      })
+    ).toThrow(/valid email/);
+
+    // Password exceeding 72 bytes fails
+    expect(() =>
+      createProductViewerSchema.parse({
+        email: 'employee3@sandm.local',
+        password: 'a'.repeat(73),
+      })
+    ).toThrow(/72 bytes/);
+
+    // Reset password schema accepts password or newPassword (min 6 chars)
+    const reset1 = resetUserPasswordSchema.parse({
+      password: 'newPassword123',
+    });
+    expect(reset1.password).toBe('newPassword123');
+
+    const reset2 = resetUserPasswordSchema.parse({
+      newPassword: 'newPassword456',
+    });
+    expect(reset2.newPassword).toBe('newPassword456');
+
+    // Toggle user status
+    const status = toggleUserStatusSchema.parse({ isActive: false });
+    expect(status.isActive).toBe(false);
+  });
+
+  it('User Mongoose model requires name for admin but allows PRODUCT_VIEWER without name', async () => {
+    const { User } = await import('../src/modules/auth/user.model.js');
+
+    // PRODUCT_VIEWER without name validates cleanly (no dummy or fake name required)
+    const viewer = new User({
+      email: 'viewer@example.com',
+      passwordHash: 'hashedpassword',
+      role: 'PRODUCT_VIEWER',
+    });
+    const viewerError = viewer.validateSync();
+    expect(viewerError).toBeUndefined();
+    expect(viewer.name).toBeUndefined();
+
+    // Admin without name fails validation
+    const admin = new User({
+      email: 'admin@example.com',
+      passwordHash: 'hashedpassword',
+      role: 'admin',
+    });
+    const adminError = admin.validateSync();
+    expect(adminError).toBeDefined();
+    expect(adminError?.errors?.['name']).toBeDefined();
   });
 });
 

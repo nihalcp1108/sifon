@@ -268,7 +268,7 @@ export class SaleService {
 
     const sales = await Sale.find(filter)
       .populate('items.productId', 'code name unit')
-      .populate('items.sourceAreaId', 'areaNumber description')
+      .populate('items.sourceAreaId', 'name areaNumber description')
       .populate('createdBy', 'name email')
       .sort({ saleDate: -1, createdAt: -1 })
       .skip((page - 1) * limit)
@@ -289,7 +289,7 @@ export class SaleService {
   static async getSaleById(id: string): Promise<ISale> {
     const sale = await Sale.findById(id)
       .populate('items.productId', 'code name unit')
-      .populate('items.sourceAreaId', 'areaNumber description')
+      .populate('items.sourceAreaId', 'name areaNumber description')
       .populate('createdBy', 'name email')
       .populate('cancelledBy', 'name email')
       .lean();

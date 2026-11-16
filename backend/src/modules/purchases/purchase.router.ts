@@ -7,12 +7,12 @@ import {
   cancelPurchaseSchema,
   purchaseQuerySchema,
 } from './purchase.validation.js';
-import { requireAuth } from '../../middleware/auth.js';
+import { requireAuth, requireAdmin } from '../../middleware/auth.js';
 import { idempotencyMiddleware } from '../../middleware/idempotency.js';
 
 const router = Router();
 
-router.use(requireAuth);
+router.use(requireAuth, requireAdmin);
 
 router.post(
   '/',

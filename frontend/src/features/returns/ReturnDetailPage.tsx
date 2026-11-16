@@ -64,6 +64,10 @@ export const ReturnDetailPage: React.FC = () => {
     );
   }
 
+  const condition = returnDoc.condition || (returnDoc.damagedQuantity > 0 ? 'DAMAGED' : 'USABLE');
+  const totalQty = (returnDoc.nonDamagedQuantity || 0) + (returnDoc.damagedQuantity || 0);
+  const locationName = returnDoc.receivingAreaId?.displayName || returnDoc.receivingAreaId?.name || 'Location';
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div className="flex items-center gap-3">
@@ -78,7 +82,7 @@ export const ReturnDetailPage: React.FC = () => {
       </div>
 
       <PageHeader
-        title={`Customer Return: ${returnDoc.reference}`}
+        title={`Return: ${returnDoc.reference}`}
         subtitle={`Recorded on ${formatDate(returnDoc.returnDate)} by ${returnDoc.createdBy?.name || 'Admin'}`}
         action={
           <div className="flex items-center gap-2">
@@ -109,7 +113,7 @@ export const ReturnDetailPage: React.FC = () => {
         <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 space-y-1">
           <div className="font-bold flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-rose-600" />
-            This customer return was cancelled and its inventory movements reversed.
+            This return was cancelled and its inventory movements reversed.
           </div>
           <p>
             <strong>Reason:</strong> {returnDoc.cancellationReason || 'No reason specified'}
@@ -123,27 +127,40 @@ export const ReturnDetailPage: React.FC = () => {
 
       {/* Main Details Grid */}
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pb-6 border-b border-slate-100 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 pb-6 border-b border-slate-100 text-xs">
           <div>
             <span className="text-slate-400 uppercase font-semibold block mb-1">Return Date</span>
             <span className="font-mono font-medium text-slate-800">{formatDate(returnDoc.returnDate)}</span>
           </div>
           <div>
-            <span className="text-slate-400 uppercase font-semibold block mb-1">Original Sale</span>
-            <span className="font-mono font-bold text-navy-950">
-              {returnDoc.saleId?.reference || '-'}
-            </span>
-          </div>
-          <div>
             <span className="text-slate-400 uppercase font-semibold block mb-1">Product</span>
-            <span className="font-semibold text-slate-800">
+            <span className="font-semibold text-slate-900 block text-sm">
               {returnDoc.productId?.name}
             </span>
+            <span className="font-mono text-[11px] text-slate-400">{returnDoc.productId?.code}</span>
           </div>
           <div>
-            <span className="text-slate-400 uppercase font-semibold block mb-1">Receiving Area</span>
-            <span className="font-semibold text-navy-950">
-              {returnDoc.receivingAreaId?.displayName || 'Area'}
+            <span className="text-slate-400 uppercase font-semibold block mb-1">Location</span>
+            <span className="font-semibold text-navy-950 block text-sm">
+              {locationName}
+            </span>
+          </div>
+          <div>
+            <span className="text-slate-400 uppercase font-semibold block mb-1">Quantity</span>
+            <span className="font-mono font-bold text-navy-950 block text-sm">
+              {totalQty.toLocaleString()}
+            </span>
+          </div>
+          <div>
+            <span className="text-slate-400 uppercase font-semibold block mb-1">Condition</span>
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold ${
+                condition === 'USABLE'
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  : 'bg-rose-50 text-rose-700 border border-rose-200'
+              }`}
+            >
+              {condition}
             </span>
           </div>
         </div>
@@ -153,30 +170,34 @@ export const ReturnDetailPage: React.FC = () => {
           <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200/80">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-semibold uppercase tracking-wider text-emerald-800">
-                Non-Damaged Returned Quantity
+                Usable Returned Stock
               </span>
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             </div>
             <div className="text-2xl font-bold font-mono text-emerald-700">
-              +{returnDoc.nonDamagedQuantity.toLocaleString()} {returnDoc.productId?.unit || 'pcs'}
+              +{returnDoc.nonDamagedQuantity.toLocaleString()}
             </div>
             <p className="text-[11px] text-emerald-600 mt-1">
-              Restored into available inventory in {returnDoc.receivingAreaId?.displayName}
+              {returnDoc.nonDamagedQuantity > 0
+                ? `Restored into available inventory in ${locationName}`
+                : 'No usable units returned'}
             </p>
           </div>
 
           <div className="p-4 rounded-xl bg-rose-50/60 border border-rose-200/80">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-semibold uppercase tracking-wider text-rose-800">
-                Damaged Returned Quantity
+                Damaged Returned Stock
               </span>
               <AlertCircle className="w-4 h-4 text-rose-600" />
             </div>
             <div className="text-2xl font-bold font-mono text-rose-600">
-              +{returnDoc.damagedQuantity.toLocaleString()} {returnDoc.productId?.unit || 'pcs'}
+              +{returnDoc.damagedQuantity.toLocaleString()}
             </div>
             <p className="text-[11px] text-rose-600 mt-1">
-              Placed in separate damaged inventory. Never counted as available stock.
+              {returnDoc.damagedQuantity > 0
+                ? 'Placed into damaged inventory. Never counted as available stock.'
+                : 'No damaged units returned'}
             </p>
           </div>
         </div>
@@ -184,12 +205,20 @@ export const ReturnDetailPage: React.FC = () => {
         {/* Reason Box */}
         <div>
           <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
-            Return Reason / Justification
+            Notes / Reason
           </h4>
           <p className="text-xs text-slate-800 bg-slate-50 p-3.5 rounded-lg border border-slate-100 leading-relaxed">
-            {returnDoc.reason}
+            {returnDoc.reason || (returnDoc as any).notes || '—'}
           </p>
         </div>
+
+        {/* Legacy Sale Info if Present */}
+        {returnDoc.saleId && (
+          <div className="pt-4 border-t border-slate-100 text-xs text-slate-500">
+            <span>Linked Original Sale: </span>
+            <strong className="font-mono text-slate-800">{returnDoc.saleId.reference}</strong>
+          </div>
+        )}
       </div>
 
       {/* Cancel Return Dialog */}
@@ -197,11 +226,11 @@ export const ReturnDetailPage: React.FC = () => {
         isOpen={cancelModalOpen}
         onClose={() => setCancelModalOpen(false)}
         title="Cancel & Reverse Return?"
-        message="Are you sure you want to cancel this return? Reversing will atomically deduct the restored available units and damaged units from the receiving area. This operation will be rejected if the required balances are no longer sufficient."
+        message="Are you sure you want to cancel this return? Reversing will atomically deduct the returned units from the destination location. This operation will be rejected if the required balances are no longer sufficient."
         confirmText="Cancel Return & Reverse Stock"
         variant="danger"
         requireReason={true}
-        reasonPlaceholder="Specify reason for cancelling this customer return..."
+        reasonPlaceholder="Specify reason for cancelling this return..."
         isLoading={cancelMutation.isPending}
         onConfirm={async (reason) => {
           if (reason) {

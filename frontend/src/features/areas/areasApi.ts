@@ -85,7 +85,7 @@ export const areasApi = {
 
   createArea: async (data: {
     name: string;
-    sectionId: string;
+    sectionId?: string;
     description?: string;
     areaNumber?: number;
   }): Promise<Area> => {

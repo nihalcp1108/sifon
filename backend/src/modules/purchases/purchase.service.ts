@@ -263,7 +263,7 @@ export class PurchaseService {
 
     const purchases = await Purchase.find(filter)
       .populate('items.productId', 'code name unit')
-      .populate('items.receivingAreaId', 'areaNumber description')
+      .populate('items.receivingAreaId', 'name areaNumber description')
       .populate('createdBy', 'name email')
       .sort({ purchaseDate: -1, createdAt: -1 })
       .skip((page - 1) * limit)
@@ -284,7 +284,7 @@ export class PurchaseService {
   static async getPurchaseById(id: string): Promise<IPurchase> {
     const purchase = await Purchase.findById(id)
       .populate('items.productId', 'code name unit')
-      .populate('items.receivingAreaId', 'areaNumber description')
+      .populate('items.receivingAreaId', 'name areaNumber description')
       .populate('createdBy', 'name email')
       .populate('cancelledBy', 'name email')
       .lean();

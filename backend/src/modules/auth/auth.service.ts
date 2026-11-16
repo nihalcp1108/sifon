@@ -9,6 +9,7 @@ import {
   UnauthorizedError,
   BadRequestError,
   ConflictError,
+  NotFoundError,
 } from '../../utils/errors.js';
 import {
   LoginInput,
@@ -209,6 +210,134 @@ export class AuthService {
         throw error;
       }
     }
+  }
+
+  static async createProductViewer(
+    input: { email: string; password: string },
+    adminUserId: string
+  ): Promise<any> {
+    const normalizedEmail = input.email.toLowerCase().trim();
+    const existing = await User.findOne({ email: normalizedEmail });
+    if (existing) {
+      throw new ConflictError('An account with this email address already exists');
+    }
+
+    const salt = await bcrypt.genSalt(12);
+    const passwordHash = await bcrypt.hash(input.password, salt);
+
+    const user = await User.create({
+      email: normalizedEmail,
+      passwordHash,
+      role: 'PRODUCT_VIEWER',
+      isActive: true,
+      tokenVersion: 0,
+    });
+
+    await AuditLog.create({
+      entityType: 'AUTH',
+      entityId: user._id,
+      action: 'USER_CREATED',
+      performedBy: new mongoose.Types.ObjectId(adminUserId),
+      details: { email: user.email, role: user.role },
+      timestamp: new Date(),
+    });
+
+    return {
+      _id: user._id,
+      email: user.email,
+      name: user.name || undefined,
+      role: user.role,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+  }
+
+  static async listUsers(): Promise<any[]> {
+    return await User.find({}, '-passwordHash').sort({ createdAt: -1 }).lean();
+  }
+
+  static async resetUserPassword(
+    targetUserId: string,
+    newPassword: string,
+    adminUserId: string
+  ): Promise<any> {
+    if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
+      throw new BadRequestError('Invalid user ID format');
+    }
+
+    const user = await User.findById(targetUserId);
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    const salt = await bcrypt.genSalt(12);
+    user.passwordHash = await bcrypt.hash(newPassword, salt);
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+    await user.save();
+
+    await AuditLog.create({
+      entityType: 'AUTH',
+      entityId: user._id,
+      action: 'PASSWORD_RESET_BY_ADMIN',
+      performedBy: new mongoose.Types.ObjectId(adminUserId),
+      details: { targetEmail: user.email },
+      timestamp: new Date(),
+    });
+
+    return {
+      _id: user._id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      isActive: user.isActive,
+      updatedAt: user.updatedAt,
+    };
+  }
+
+  static async setUserStatus(
+    targetUserId: string,
+    isActive: boolean,
+    adminUserId: string
+  ): Promise<any> {
+    if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
+      throw new BadRequestError('Invalid user ID format');
+    }
+
+    const user = await User.findById(targetUserId);
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    // Prevent deactivating the active admin performing the action if it's the only admin
+    if (user.role === 'admin' && !isActive) {
+      const activeAdminCount = await User.countDocuments({ role: 'admin', isActive: true });
+      if (activeAdminCount <= 1) {
+        throw new BadRequestError('Cannot deactivate the sole active administrator');
+      }
+    }
+
+    user.isActive = isActive;
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+    await user.save();
+
+    await AuditLog.create({
+      entityType: 'AUTH',
+      entityId: user._id,
+      action: isActive ? 'USER_ACTIVATED' : 'USER_DEACTIVATED',
+      performedBy: new mongoose.Types.ObjectId(adminUserId),
+      details: { targetEmail: user.email, isActive },
+      timestamp: new Date(),
+    });
+
+    return {
+      _id: user._id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      isActive: user.isActive,
+      updatedAt: user.updatedAt,
+    };
   }
 }
 

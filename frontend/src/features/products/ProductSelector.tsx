@@ -128,7 +128,7 @@ export const ProductSelector = React.forwardRef<HTMLSelectElement, ProductSelect
             return bId === selectedAreaId;
           });
           const qty = bal?.availableQuantity ?? 0;
-          return `${p.name}${brandStr} — ${qty > 0 ? `${qty} ${p.unit} in Area` : 'Out of stock in Area'}`;
+          return `${p.name}${brandStr} — ${qty > 0 ? `${qty} ${p.unit} in location` : 'Out of stock in location'}`;
         }
         const total = p.totalAvailable ?? 0;
         return `${p.name}${brandStr} — Total: ${total} ${p.unit} avail`;
@@ -272,12 +272,12 @@ export const ProductSelector = React.forwardRef<HTMLSelectElement, ProductSelect
                 )}
               >
                 {(areaAvailableStock ?? 0) > 0
-                  ? `${areaAvailableStock} ${selectedProduct.unit} available in selected area`
-                  : `0 ${selectedProduct.unit} (Out of stock in selected area)`}
+                  ? `${areaAvailableStock} ${selectedProduct.unit} available in selected location`
+                  : `0 ${selectedProduct.unit} (Out of stock in selected location)`}
               </span>
             ) : (
               <span className="text-slate-500">
-                Total available: <strong className="text-slate-700 font-semibold">{selectedProduct.totalAvailable ?? 0} {selectedProduct.unit}</strong> (pick source area)
+                Total available: <strong className="text-slate-700 font-semibold">{selectedProduct.totalAvailable ?? 0} {selectedProduct.unit}</strong> (pick source location)
               </span>
             )}
           </div>

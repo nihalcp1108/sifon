@@ -131,7 +131,7 @@ export const AreaMatrixView: React.FC<{ data: MatrixStatementData }> = ({ data }
         <tfoot>
           <tr className="bg-slate-100 font-bold text-navy-950 uppercase border-t-2 border-slate-300 text-xs">
             <td className="py-3 px-4 sticky left-0 bg-slate-100 border-r border-slate-300">
-              Area Column Totals
+              Location Column Totals
             </td>
             <td className="py-3 px-3 text-center border-r border-slate-300">-</td>
             <td className="py-3 px-3 text-center border-r border-slate-300">-</td>

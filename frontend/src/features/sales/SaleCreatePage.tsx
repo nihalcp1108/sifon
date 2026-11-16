@@ -11,15 +11,16 @@ import { areasApi } from '../areas/areasApi';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
-import { Select } from '../../components/common/Select';
 import { useToast } from '../../components/common/Toast';
 import { generateIdempotencyKey } from '../../lib/utils';
-import { ProductSelector } from '../products/ProductSelector';
+import { SearchableProductSelect } from '../products/SearchableProductSelect';
+import { SearchableLocationSelect } from '../areas/SearchableLocationSelect';
+import { ProductStockBreakdown } from '../products/ProductStockBreakdown';
 import { ProductFormModal } from '../products/ProductFormModal';
 
 const saleItemSchema = z.object({
   productId: z.string().min(1, 'Please select a product'),
-  sourceAreaId: z.string().min(1, 'Please select source area'),
+  sourceAreaId: z.string().min(1, 'Please select source location'),
   quantity: z.coerce
     .number({ invalid_type_error: 'Quantity must be a valid number' })
     .int('Quantity must be an integer')
@@ -56,7 +57,6 @@ export const SaleCreatePage: React.FC = () => {
   // Fetch active warehouse areas
   const {
     data: areasData,
-    isLoading: isAreasLoading,
     isError: isAreasError,
     error: areasError,
     refetch: refetchAreas,
@@ -133,11 +133,11 @@ export const SaleCreatePage: React.FC = () => {
       for (let i = 0; i < data.items.length; i++) {
         const item = data.items[i];
         const avail = getAvailableStock(item.productId, item.sourceAreaId);
-        if (item.quantity > avail) {
-          const prod = activeProducts.find(p => p._id === item.productId);
+        const prod = activeProducts.find(p => p._id === item.productId);
+        if (prod && item.quantity > avail) {
           const area = activeAreas.find(a => a._id === item.sourceAreaId);
           setSubmitError(
-            `Line ${i + 1}: Requested quantity (${item.quantity}) exceeds available stock (${avail}) for ${prod?.name || 'Product'} in ${area?.displayName || `Area ${area?.areaNumber || ''}`}.`
+            `Line ${i + 1}: Requested quantity (${item.quantity}) exceeds available stock (${avail}) for ${prod.name} in ${area?.displayName || 'selected location'}.`
           );
           return;
         }
@@ -220,7 +220,7 @@ export const SaleCreatePage: React.FC = () => {
 
       <PageHeader
         title="Record New Sale"
-        subtitle="Outbound customer shipment. Posted sales atomically deduct stock from the source areas."
+        subtitle="Outbound customer shipment. Posted sales atomically deduct stock from the source locations."
       />
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -274,7 +274,7 @@ export const SaleCreatePage: React.FC = () => {
                 Sale Line Items
               </h3>
               <p className="text-xs text-slate-500">
-                Pick product and source area. Available balance in the area is verified in real-time.
+                Pick product and source location. Available balance in the location is verified in real-time.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -286,7 +286,7 @@ export const SaleCreatePage: React.FC = () => {
                 onClick={() =>
                   append({
                     productId: '',
-                    sourceAreaId: activeAreas[0]?._id || '',
+                    sourceAreaId: '',
                     quantity: 1,
                   })
                 }
@@ -305,7 +305,7 @@ export const SaleCreatePage: React.FC = () => {
               <div className="flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
                 <span>
-                  Failed to load active warehouse areas:{' '}
+                  Failed to load active warehouse locations:{' '}
                   {(areasError as any)?.response?.data?.message ||
                     (areasError as any)?.message ||
                     'Network error'}
@@ -315,7 +315,7 @@ export const SaleCreatePage: React.FC = () => {
                 type="button"
                 onClick={() => refetchAreas()}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:text-rose-900 bg-rose-100/60 hover:bg-rose-100 rounded-md transition-colors shrink-0 ml-2"
-                aria-label="Retry loading areas"
+                aria-label="Retry loading locations"
               >
                 <RefreshCw className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                 <span>Retry</span>
@@ -331,12 +331,6 @@ export const SaleCreatePage: React.FC = () => {
             <div className="space-y-4">
               {fields.map((field, idx) => {
                 const selectedProdId = watchedItems?.[idx]?.productId;
-                const selectedAreaId = watchedItems?.[idx]?.sourceAreaId;
-                const availStock = getAvailableStock(selectedProdId, selectedAreaId);
-                const selectedProd = activeProducts.find(p => p._id === selectedProdId);
-                const selectedArea = activeAreas.find(a => a._id === selectedAreaId);
-                const reqQty = watchedItems?.[idx]?.quantity || 0;
-                const isOverStock = selectedProdId && selectedAreaId && reqQty > availStock;
 
                 return (
                   <div
@@ -344,45 +338,44 @@ export const SaleCreatePage: React.FC = () => {
                     className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3"
                   >
                     <div className="flex flex-col sm:flex-row items-start gap-3">
-                      <div className="flex-1 w-full">
+                      <div className="flex-1 w-full space-y-2">
                         <Controller
                           control={control}
                           name={`items.${idx}.productId`}
                           render={({ field: pField }) => (
-                            <ProductSelector
+                            <SearchableProductSelect
                               id={`items.${idx}.productId`}
                               label={`Product #${idx + 1}`}
                               value={pField.value}
-                              onChange={pField.onChange}
-                              onBlur={pField.onBlur}
-                              mode="sale"
-                              selectedAreaId={selectedAreaId}
+                              onChange={(val) => {
+                                pField.onChange(val);
+                                setValue(`items.${idx}.sourceAreaId`, '');
+                              }}
                               error={errors.items?.[idx]?.productId?.message}
-                              onAddNewProduct={() => setIsProductModalOpen(true)}
                             />
                           )}
                         />
+                        {selectedProdId && (
+                          <ProductStockBreakdown productId={selectedProdId} />
+                        )}
                       </div>
 
                       <div className="flex-1 w-full">
-                        <Select
-                          label="Source Area"
-                          error={errors.items?.[idx]?.sourceAreaId?.message}
-                          {...register(`items.${idx}.sourceAreaId`)}
-                        >
-                          <option value="">
-                            {isAreasLoading
-                              ? '-- Loading areas... --'
-                              : activeAreas.length === 0
-                                ? '-- No active areas --'
-                                : '-- Select Source Area --'}
-                          </option>
-                          {activeAreas.map(a => (
-                            <option key={a._id} value={a._id}>
-                              {a.displayName || `Area ${a.areaNumber}`} {a.description ? `(${a.description})` : ''}
-                            </option>
-                          ))}
-                        </Select>
+                        <Controller
+                          control={control}
+                          name={`items.${idx}.sourceAreaId`}
+                          render={({ field: locField }) => (
+                            <SearchableLocationSelect
+                              id={`items.${idx}.sourceAreaId`}
+                              label="Source Location"
+                              value={locField.value}
+                              onChange={locField.onChange}
+                              mode="sale"
+                              productId={selectedProdId}
+                              error={errors.items?.[idx]?.sourceAreaId?.message}
+                            />
+                          )}
+                        />
                       </div>
 
                       <div className="w-full sm:w-32">
@@ -408,40 +401,6 @@ export const SaleCreatePage: React.FC = () => {
                         </button>
                       )}
                     </div>
-
-                    {/* Real-time available stock callout and warning */}
-                    {selectedProdId && (
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs px-3 py-2 bg-white rounded-lg border border-slate-200 gap-1.5">
-                        <span className="text-slate-600">
-                          {selectedAreaId ? (
-                            <>
-                              Stock in {selectedArea?.displayName || 'selected area'}:{' '}
-                              <strong
-                                className={`font-mono font-bold ${availStock > 0 ? 'text-emerald-700' : 'text-rose-600'
-                                  }`}
-                              >
-                                {availStock.toLocaleString()} {selectedProd?.unit || 'pcs'}
-                              </strong>
-                            </>
-                          ) : (
-                            <>
-                              Total stock across areas:{' '}
-                              <strong className="font-mono font-bold text-slate-800">
-                                {selectedProd?.totalAvailable ?? 0} {selectedProd?.unit || 'pcs'}
-                              </strong>{' '}
-                              <span className="text-slate-400">(select a source area to verify availability)</span>
-                            </>
-                          )}
-                        </span>
-
-                        {isOverStock && !isDraft && (
-                          <span className="text-rose-600 font-semibold flex items-center gap-1">
-                            <AlertCircle className="w-3.5 h-3.5" />
-                            Insufficient stock in {selectedArea?.displayName || 'area'}!
-                          </span>
-                        )}
-                      </div>
-                    )}
                   </div>
                 );
               })}

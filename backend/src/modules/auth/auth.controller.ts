@@ -118,5 +118,57 @@ export class AuthController {
       next(error);
     }
   }
+
+  static async createProductViewer(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const adminUser = req.user!;
+      const user = await AuthService.createProductViewer(req.body, adminUser._id.toString());
+      return sendSuccess(res, user, 'Product viewer account created successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async listUsers(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const users = await AuthService.listUsers();
+      return sendSuccess(res, users);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async resetUserPassword(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const adminUser = req.user!;
+      const newPassword = req.body.password || req.body.newPassword;
+      const user = await AuthService.resetUserPassword(
+        req.params.id as string,
+        newPassword,
+        adminUser._id.toString()
+      );
+      return sendSuccess(res, user, 'Password reset successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async setUserStatus(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const adminUser = req.user!;
+      const user = await AuthService.setUserStatus(
+        req.params.id as string,
+        req.body.isActive,
+        adminUser._id.toString()
+      );
+      return sendSuccess(
+        res,
+        user,
+        `Account ${user.isActive ? 'activated' : 'deactivated'} successfully`
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 

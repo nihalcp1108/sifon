@@ -12,6 +12,7 @@
     "create-admin": "tsx scripts/create-admin.ts",
     "seed": "tsx scripts/seed.ts",
     "reconcile": "tsx scripts/reconcile.ts",
+    "migrate:locations": "tsx scripts/migrate-locations.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

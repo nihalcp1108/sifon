@@ -4,8 +4,8 @@ export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
   email: string;
   passwordHash: string;
-  name: string;
-  role: 'admin';
+  name?: string;
+  role: 'admin' | 'PRODUCT_VIEWER';
   isActive: boolean;
   tokenVersion: number;
   createdAt: Date;
@@ -28,12 +28,14 @@ const UserSchema = new Schema<IUser>(
     },
     name: {
       type: String,
-      required: true,
+      required: function (this: any) {
+        return this.role === 'admin';
+      },
       trim: true,
     },
     role: {
       type: String,
-      enum: ['admin'],
+      enum: ['admin', 'PRODUCT_VIEWER'],
       default: 'admin',
     },
     isActive: {

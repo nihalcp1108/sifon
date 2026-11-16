@@ -29,20 +29,22 @@ export const Topbar: React.FC<{ onOpenMobileMenu: () => void }> = ({ onOpenMobil
         {user && (
           <div className="flex items-center gap-3 pl-3">
             <div className="w-8 h-8 rounded-full bg-navy-100 border border-navy-200 text-navy-900 flex items-center justify-center font-bold text-xs">
-              {user.name.charAt(0).toUpperCase()}
+              {(user.name || user.email || 'U').charAt(0).toUpperCase()}
             </div>
             <div className="hidden md:block text-left text-xs">
-              <span className="block font-semibold text-slate-800">{user.name}</span>
+              <span className="block font-semibold text-slate-800">{user.name || user.email}</span>
               <span className="block text-slate-400 font-mono text-[11px]">{user.email}</span>
             </div>
-            <Link
-              to="/settings"
-              className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-navy-900 transition-colors flex items-center gap-1.5 text-xs font-medium border border-transparent hover:border-slate-200"
-              title="Account Settings"
-            >
-              <Settings className="w-4 h-4 text-slate-500" />
-              <span className="hidden sm:inline text-slate-600">Settings</span>
-            </Link>
+            {user.role === 'admin' && (
+              <Link
+                to="/settings"
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-navy-900 transition-colors flex items-center gap-1.5 text-xs font-medium border border-transparent hover:border-slate-200"
+                title="Account Settings"
+              >
+                <Settings className="w-4 h-4 text-slate-500" />
+                <span className="hidden sm:inline text-slate-600">Settings</span>
+              </Link>
+            )}
             <Button
               variant="ghost"
               size="sm"

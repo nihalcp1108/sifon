@@ -14,34 +14,35 @@ export class AreaService {
   static async createArea(input: CreateAreaInput): Promise<IArea> {
     const trimmedName = input.name.trim();
 
-    // Verify section exists and is valid
-    if (!mongoose.Types.ObjectId.isValid(input.sectionId)) {
-      throw new ValidationError('Invalid Section ID');
-    }
-    const section = await Section.findById(input.sectionId);
-    if (!section) {
-      throw new NotFoundError(`Section not found: ${input.sectionId}`);
-    }
-
-    // Check duplicate area name within the same section (case-insensitive)
+    // Check duplicate location name across all locations (case-insensitive)
     const escapedName = trimmedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const existing = await Area.findOne({
-      sectionId: section._id,
       name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
     });
     if (existing) {
-      throw new ConflictError(`Area "${trimmedName}" already exists in section "${section.name}"`);
+      throw new ConflictError(`Location "${trimmedName}" already exists`);
+    }
+
+    let sectionIdToSave: mongoose.Types.ObjectId | undefined = undefined;
+    if (input.sectionId && mongoose.Types.ObjectId.isValid(input.sectionId)) {
+      const section = await Section.findById(input.sectionId);
+      if (section) {
+        sectionIdToSave = section._id;
+      }
     }
 
     const area = await Area.create({
       name: trimmedName,
-      sectionId: section._id,
+      sectionId: sectionIdToSave,
       description: input.description?.trim(),
       areaNumber: input.areaNumber,
       isActive: true,
     });
 
-    return await area.populate('sectionId', 'name description');
+    if (sectionIdToSave) {
+      return await area.populate('sectionId', 'name description');
+    }
+    return area;
   }
 
   static async getAreas(query: AreaQueryInput) {
@@ -94,13 +95,15 @@ export class AreaService {
     const enrichedAreas = areas.map(a => {
       const section = a.sectionId as any;
       const hasValidSection = section && typeof section === 'object' && Boolean(section.name);
-      const sectionName = hasValidSection ? section.name : 'Unassigned';
-      const areaName = a.name || (a.areaNumber ? `Area ${a.areaNumber}` : 'Unnamed Area');
-      const displayName = hasValidSection ? `${sectionName} — ${areaName}` : areaName;
+      const sectionName = hasValidSection ? section.name : undefined;
+      const baseName = a.name || (a.areaNumber ? `Area ${a.areaNumber}` : 'Unnamed Location');
+      const displayName = hasValidSection && !baseName.toLowerCase().includes(section.name.toLowerCase())
+        ? `${section.name} — ${baseName}`
+        : baseName;
 
       return {
         ...a,
-        name: areaName,
+        name: displayName,
         displayName,
         sectionId: hasValidSection ? section : undefined,
         section: hasValidSection ? { _id: section._id, name: section.name } : undefined,
@@ -174,13 +177,15 @@ export class AreaService {
     const enrichedAreas = resultList.map(a => {
       const section = a.sectionId as any;
       const hasValidSection = section && typeof section === 'object' && Boolean(section.name);
-      const sectionName = hasValidSection ? section.name : 'Unassigned';
-      const areaName = a.name || (a.areaNumber ? `Area ${a.areaNumber}` : 'Unnamed Area');
-      const displayName = hasValidSection ? `${sectionName} — ${areaName}` : areaName;
+      const sectionName = hasValidSection ? section.name : undefined;
+      const baseName = a.name || (a.areaNumber ? `Area ${a.areaNumber}` : 'Unnamed Location');
+      const displayName = hasValidSection && !baseName.toLowerCase().includes(section.name.toLowerCase())
+        ? `${section.name} — ${baseName}`
+        : baseName;
 
       return {
         _id: a._id,
-        name: areaName,
+        name: displayName,
         displayName,
         sectionId: hasValidSection ? section : undefined,
         section: hasValidSection ? { _id: section._id, name: section.name } : undefined,
@@ -211,7 +216,7 @@ export class AreaService {
     }
     const area = await Area.findById(id).populate('sectionId', 'name description');
     if (!area) {
-      throw new NotFoundError('Area not found');
+      throw new NotFoundError('Location not found');
     }
     return area;
   }
@@ -222,48 +227,38 @@ export class AreaService {
     }
     const area = await Area.findById(id);
     if (!area) {
-      throw new NotFoundError('Area not found');
+      throw new NotFoundError('Location not found');
     }
 
-    // Determine target section
-    let targetSectionId = area.sectionId;
-    if (input.sectionId !== undefined) {
-      if (input.sectionId) {
-        if (!mongoose.Types.ObjectId.isValid(input.sectionId)) {
-          throw new ValidationError('Invalid Section ID');
-        }
-        const section = await Section.findById(input.sectionId);
-        if (!section) {
-          throw new NotFoundError(`Section not found: ${input.sectionId}`);
-        }
-        area.sectionId = section._id;
-        targetSectionId = section._id;
-      }
-    }
-
-    const targetName = input.name !== undefined ? input.name.trim() : (area.name || (area.areaNumber ? `Area ${area.areaNumber}` : 'Unnamed Area'));
-
-    if (input.name !== undefined || input.sectionId !== undefined) {
-      // Validate uniqueness within target section
-      if (targetSectionId) {
-        const escaped = targetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const existing = await Area.findOne({
-          _id: { $ne: area._id },
-          sectionId: targetSectionId,
-          name: { $regex: new RegExp(`^${escaped}$`, 'i') },
-        });
-        if (existing) {
-          throw new ConflictError(`Another area named "${targetName}" already exists in this section`);
-        }
+    if (input.name !== undefined) {
+      const targetName = input.name.trim();
+      const escaped = targetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const existing = await Area.findOne({
+        _id: { $ne: area._id },
+        name: { $regex: new RegExp(`^${escaped}$`, 'i') },
+      });
+      if (existing) {
+        throw new ConflictError(`Another location named "${targetName}" already exists`);
       }
       area.name = targetName;
     }
 
-    // Check if user is attempting to deactivate an area with remaining stock
+    if (input.sectionId !== undefined) {
+      if (input.sectionId && mongoose.Types.ObjectId.isValid(input.sectionId)) {
+        const section = await Section.findById(input.sectionId);
+        if (section) {
+          area.sectionId = section._id;
+        }
+      } else {
+        area.sectionId = undefined;
+      }
+    }
+
+    // Check if user is attempting to deactivate a location with remaining stock
     if (input.isActive === false && area.isActive === true) {
       const hasStock = await InventoryService.checkAreaHasStock(area._id);
       if (hasStock) {
-        const label = area.displayName || area.name || (area.areaNumber ? `Area ${area.areaNumber}` : 'this area');
+        const label = area.displayName || area.name || 'this location';
         throw new BadRequestError(
           `Cannot deactivate ${label} while available or damaged stock remains in it.`
         );
@@ -287,14 +282,14 @@ export class AreaService {
     }
     const area = await Area.findById(id);
     if (!area) {
-      throw new NotFoundError('Area not found');
+      throw new NotFoundError('Location not found');
     }
 
-    // Check if area was used in inventory history or has stock
+    // Check if location was used in inventory history or has stock
     const hasHistory = await InventoryService.checkAreaHasHistory(area._id);
     const hasStock = await InventoryService.checkAreaHasStock(area._id);
     if (hasHistory || hasStock) {
-      const label = (area as any).displayName || area.name || (area.areaNumber ? `Area ${area.areaNumber}` : 'this area');
+      const label = (area as any).displayName || area.name || (area.areaNumber ? `Area ${area.areaNumber}` : 'this location');
       throw new BadRequestError(
         `Cannot delete ${label} because it has historical inventory transactions or active stock. Consider deactivating it instead.`
       );

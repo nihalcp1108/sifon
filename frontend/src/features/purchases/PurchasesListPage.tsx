@@ -160,8 +160,7 @@ export const PurchasesListPage: React.FC = () => {
                           {p.items
                             .map(
                               i =>
-                                `${i.productId?.code || 'SKU'} (${i.quantity} into Area ${
-                                  i.receivingAreaId?.areaNumber ?? '?'
+                                `${i.productId?.name || i.productId?.code || 'Product'} (${i.quantity} into ${i.receivingAreaId?.displayName || i.receivingAreaId?.name || 'Location'
                                 })`
                             )
                             .join(', ')}
@@ -179,8 +178,8 @@ export const PurchasesListPage: React.FC = () => {
                             p.status === 'POSTED'
                               ? 'posted'
                               : p.status === 'DRAFT'
-                              ? 'draft'
-                              : 'cancelled'
+                                ? 'draft'
+                                : 'cancelled'
                           }
                         >
                           {p.status}

@@ -36,7 +36,7 @@ export const SalesListPage: React.FC = () => {
     <div className="space-y-6">
       <PageHeader
         title="Sales Orders"
-        subtitle="Manage outbound shipments. Sales deduct stock from designated storage areas."
+        subtitle="Manage outbound shipments. Sales deduct stock from designated storage locations."
         action={
           <Button
             size="sm"
@@ -122,7 +122,7 @@ export const SalesListPage: React.FC = () => {
             <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto mb-3" />
             <h4 className="text-base font-bold text-slate-700">No sales recorded yet</h4>
             <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 mb-4">
-              Post an outbound sale to reduce stock in the designated area.
+              Post an outbound sale to reduce stock in the designated location.
             </p>
             <Button size="sm" variant="primary" onClick={() => navigate('/sales/new')}>
               Record Sale
@@ -164,8 +164,8 @@ export const SalesListPage: React.FC = () => {
                           {s.items
                             .map(
                               i =>
-                                `${i.productId?.code || 'SKU'} (${i.quantity} from Area ${
-                                  i.sourceAreaId?.areaNumber ?? '?'
+                                `${i.productId?.name || i.productId?.code || 'Product'} (${i.quantity} from ${
+                                  i.sourceAreaId?.displayName || i.sourceAreaId?.name || 'Location'
                                 })`
                             )
                             .join(', ')}

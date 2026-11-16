@@ -14,12 +14,14 @@ import { Pagination } from '../../components/common/Pagination';
 import { TableSkeleton } from '../../components/common/Skeleton';
 import { useToast } from '../../components/common/Toast';
 import { Product } from '../../types';
+import { useAuth } from '../auth/useAuth';
 
 export const ProductsListPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { user } = useAuth();
 
   const [modalOpen, setModalOpen] = useState(searchParams.get('action') === 'new');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -108,19 +110,21 @@ export const ProductsListPage: React.FC = () => {
     <div className="space-y-6">
       <PageHeader
         title="Products & Inventory"
-        subtitle="Manage product catalog, view brand/category classifications, and track stock across areas"
+        subtitle="Manage product catalog, view brand/category classifications, and track stock across locations"
         action={
-          <Button
-            size="sm"
-            variant="primary"
-            leftIcon={<Plus className="w-4 h-4 text-teal-400" />}
-            onClick={() => {
-              setEditingProduct(null);
-              setModalOpen(true);
-            }}
-          >
-            Add Product
-          </Button>
+          user?.role === 'admin' ? (
+            <Button
+              size="sm"
+              variant="primary"
+              leftIcon={<Plus className="w-4 h-4 text-teal-400" />}
+              onClick={() => {
+                setEditingProduct(null);
+                setModalOpen(true);
+              }}
+            >
+              Add Product
+            </Button>
+          ) : undefined
         }
       />
 
@@ -204,16 +208,18 @@ export const ProductsListPage: React.FC = () => {
                 ? 'No products match your search or filter criteria.'
                 : 'Add your first product to begin tracking inventory.'}
             </p>
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={() => {
-                setEditingProduct(null);
-                setModalOpen(true);
-              }}
-            >
-              Add Product
-            </Button>
+            {user?.role === 'admin' && (
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => {
+                  setEditingProduct(null);
+                  setModalOpen(true);
+                }}
+              >
+                Add Product
+              </Button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -223,7 +229,7 @@ export const ProductsListPage: React.FC = () => {
                   <th className="py-3.5 px-6">Product Name</th>
                   <th className="py-3.5 px-6">Brand</th>
                   <th className="py-3.5 px-6">Category</th>
-                  <th className="py-3.5 px-6">Unit</th>
+                  <th className="py-3.5 px-6">Location(s)</th>
                   <th className="py-3.5 px-6 text-right">Available Stock</th>
                   <th className="py-3.5 px-6 text-right">Damaged Stock</th>
                   <th className="py-3.5 px-6 text-center">Status</th>
@@ -241,6 +247,10 @@ export const ProductsListPage: React.FC = () => {
                     typeof prod.categoryId === 'object' && (prod.categoryId as any)?.name
                       ? (prod.categoryId as any).name
                       : prod.category?.name || '—';
+
+                  const stockedLocations = (prod.areaBalances || [])
+                    .filter((b: any) => (b.availableQuantity > 0 || b.damagedQuantity > 0))
+                    .map((b: any) => b.areaId?.displayName || b.areaId?.name || (b.areaId?.areaNumber ? `Area ${b.areaId.areaNumber}` : 'Location'));
 
                   return (
                     <tr key={prod._id} className="hover:bg-slate-50/70 transition-colors">
@@ -262,12 +272,27 @@ export const ProductsListPage: React.FC = () => {
                           {categoryName}
                         </span>
                       </td>
-                      <td className="py-3.5 px-6 text-slate-500 font-mono text-xs">{prod.unit}</td>
+                      <td className="py-3.5 px-6">
+                        {stockedLocations.length === 0 ? (
+                          <span className="text-slate-400 italic text-xs">Not stocked</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1 max-w-xs">
+                            {stockedLocations.map((locName: string, i: number) => (
+                              <span
+                                key={i}
+                                className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200"
+                              >
+                                {locName}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
                       <td className="py-3.5 px-6 text-right font-bold text-emerald-700 font-mono">
-                        {(prod.totalAvailable ?? 0).toLocaleString()} {prod.unit}
+                        {(prod.totalAvailable ?? 0).toLocaleString()}
                       </td>
                       <td className="py-3.5 px-6 text-right font-bold text-rose-600 font-mono">
-                        {(prod.totalDamaged ?? 0).toLocaleString()} {prod.unit}
+                        {(prod.totalDamaged ?? 0).toLocaleString()}
                       </td>
                       <td className="py-3.5 px-6 text-center">
                         <Badge variant={prod.isActive ? 'active' : 'archived'}>
@@ -280,41 +305,45 @@ export const ProductsListPage: React.FC = () => {
                           variant="ghost"
                           onClick={() => navigate(`/products/${prod._id}`)}
                           leftIcon={<Eye className="w-3.5 h-3.5 text-teal-600" />}
-                          title="View Balances & Movements"
+                          title="View Balances & Details"
                           className="text-xs"
                         >
                           Detail
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setEditingProduct(prod);
-                            setModalOpen(true);
-                          }}
-                          leftIcon={<Edit2 className="w-3.5 h-3.5" />}
-                          className="text-slate-600 hover:text-slate-900 text-xs"
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() =>
-                            toggleArchiveMutation.mutate({
-                              id: prod._id,
-                              isActive: !prod.isActive,
-                            })
-                          }
-                          title={prod.isActive ? 'Archive Product' : 'Restore Product'}
-                          className="text-xs"
-                        >
-                          {prod.isActive ? (
-                            <span className="text-slate-400 hover:text-slate-700">Archive</span>
-                          ) : (
-                            <span className="text-teal-600 hover:text-teal-700">Restore</span>
-                          )}
-                        </Button>
+                        {user?.role === 'admin' && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingProduct(prod);
+                                setModalOpen(true);
+                              }}
+                              leftIcon={<Edit2 className="w-3.5 h-3.5" />}
+                              className="text-slate-600 hover:text-slate-900 text-xs"
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                toggleArchiveMutation.mutate({
+                                  id: prod._id,
+                                  isActive: !prod.isActive,
+                                })
+                              }
+                              title={prod.isActive ? 'Archive Product' : 'Restore Product'}
+                              className="text-xs"
+                            >
+                              {prod.isActive ? (
+                                <span className="text-slate-400 hover:text-slate-700">Archive</span>
+                              ) : (
+                                <span className="text-teal-600 hover:text-teal-700">Restore</span>
+                              )}
+                            </Button>
+                          </>
+                        )}
                       </td>
                     </tr>
                   );

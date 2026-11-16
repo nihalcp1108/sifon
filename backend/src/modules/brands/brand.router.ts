@@ -8,7 +8,7 @@ import {
   brandOptionsQuerySchema,
 } from './brand.validation.js';
 import { objectIdParamSchema } from '../../utils/query-validation.js';
-import { requireAuth } from '../../middleware/auth.js';
+import { requireAuth, requireAdmin } from '../../middleware/auth.js';
 
 const router = Router();
 
@@ -18,16 +18,17 @@ router.use(requireAuth);
 // 1. Static routes first
 router.get('/', validateRequest({ query: brandQuerySchema }), BrandController.getBrands);
 router.get('/options', validateRequest({ query: brandOptionsQuerySchema }), BrandController.getBrandOptions);
-router.post('/', validateRequest({ body: createBrandSchema }), BrandController.createBrand);
+router.post('/', requireAdmin, validateRequest({ body: createBrandSchema }), BrandController.createBrand);
 
 // 2. Dynamic ID routes
 router.get('/:id', validateRequest({ params: objectIdParamSchema }), BrandController.getBrandById);
 router.put(
   '/:id',
+  requireAdmin,
   validateRequest({ params: objectIdParamSchema, body: updateBrandSchema }),
   BrandController.updateBrand
 );
-router.delete('/:id', validateRequest({ params: objectIdParamSchema }), BrandController.deleteBrand);
+router.delete('/:id', requireAdmin, validateRequest({ params: objectIdParamSchema }), BrandController.deleteBrand);
 
 export default router;
 

@@ -27,12 +27,16 @@ export const returnsApi = {
     data: {
       reference?: string;
       returnDate: string;
-      saleId: string;
-      saleLineId: string;
+      productId?: string;
       receivingAreaId?: string;
-      nonDamagedQuantity: number;
-      damagedQuantity: number;
-      reason: string;
+      quantity?: number;
+      condition?: 'USABLE' | 'DAMAGED';
+      notes?: string;
+      reason?: string;
+      saleId?: string;
+      saleLineId?: string;
+      nonDamagedQuantity?: number;
+      damagedQuantity?: number;
     },
     idempotencyKey?: string
   ): Promise<ReturnRecord> => {

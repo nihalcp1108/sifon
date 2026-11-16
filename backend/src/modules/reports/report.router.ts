@@ -5,11 +5,11 @@ import {
   matrixStatementQuerySchema,
   periodStatementQuerySchema,
 } from './report.validation.js';
-import { requireAuth } from '../../middleware/auth.js';
+import { requireAuth, requireAdmin } from '../../middleware/auth.js';
 
 const router = Router();
 
-router.use(requireAuth);
+router.use(requireAuth, requireAdmin);
 
 router.get(
   '/matrix',

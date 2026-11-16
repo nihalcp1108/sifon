@@ -5,9 +5,13 @@ import {
   loginSchema,
   changeEmailSchema,
   changePasswordSchema,
+  createProductViewerSchema,
+  resetUserPasswordSchema,
+  toggleUserStatusSchema,
 } from './auth.validation.js';
 import { requireAuth, requireAdmin } from '../../middleware/auth.js';
 import { authRateLimiter, accountSettingsRateLimiter } from '../../middleware/rateLimiter.js';
+import { objectIdParamSchema } from '../../utils/query-validation.js';
 
 const router = Router();
 
@@ -50,6 +54,85 @@ router.put(
   accountSettingsRateLimiter,
   validateRequest({ body: changePasswordSchema }),
   AuthController.changePassword
+);
+
+// Admin User Management endpoints (Employee / Product Viewers)
+router.get('/users', requireAuth, requireAdmin, AuthController.listUsers);
+
+router.post(
+  '/users',
+  requireAuth,
+  requireAdmin,
+  accountSettingsRateLimiter,
+  validateRequest({ body: createProductViewerSchema }),
+  AuthController.createProductViewer
+);
+
+router.post(
+  '/product-viewers',
+  requireAuth,
+  requireAdmin,
+  accountSettingsRateLimiter,
+  validateRequest({ body: createProductViewerSchema }),
+  AuthController.createProductViewer
+);
+
+router.post(
+  '/viewers',
+  requireAuth,
+  requireAdmin,
+  accountSettingsRateLimiter,
+  validateRequest({ body: createProductViewerSchema }),
+  AuthController.createProductViewer
+);
+
+router.put(
+  '/users/:id/password',
+  requireAuth,
+  requireAdmin,
+  accountSettingsRateLimiter,
+  validateRequest({ params: objectIdParamSchema, body: resetUserPasswordSchema }),
+  AuthController.resetUserPassword
+);
+
+router.put(
+  '/users/:id/status',
+  requireAuth,
+  requireAdmin,
+  accountSettingsRateLimiter,
+  validateRequest({ params: objectIdParamSchema, body: toggleUserStatusSchema }),
+  AuthController.setUserStatus
+);
+
+export const usersRouter = Router();
+
+usersRouter.get('/', requireAuth, requireAdmin, AuthController.listUsers);
+
+usersRouter.post(
+  '/',
+  requireAuth,
+  requireAdmin,
+  accountSettingsRateLimiter,
+  validateRequest({ body: createProductViewerSchema }),
+  AuthController.createProductViewer
+);
+
+usersRouter.put(
+  '/:id/password',
+  requireAuth,
+  requireAdmin,
+  accountSettingsRateLimiter,
+  validateRequest({ params: objectIdParamSchema, body: resetUserPasswordSchema }),
+  AuthController.resetUserPassword
+);
+
+usersRouter.put(
+  '/:id/status',
+  requireAuth,
+  requireAdmin,
+  accountSettingsRateLimiter,
+  validateRequest({ params: objectIdParamSchema, body: toggleUserStatusSchema }),
+  AuthController.setUserStatus
 );
 
 export default router;
