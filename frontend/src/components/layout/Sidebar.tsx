@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
+  LayoutDashboard,
   Tag,
   Layers,
   MapPin,
@@ -19,6 +20,7 @@ import { cn } from '../../lib/utils';
 import { useAuth } from '../../features/auth/useAuth';
 
 const adminNavItems = [
+  { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
   { label: 'Brand', to: '/brands', icon: Tag },
   { label: 'Category', to: '/categories', icon: Layers },
   { label: 'Location', to: '/locations', icon: MapPin },

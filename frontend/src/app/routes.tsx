@@ -42,7 +42,7 @@ const RootRedirect: React.FC = () => {
   if (user?.role === 'PRODUCT_VIEWER') {
     return <Navigate to="/products" replace />;
   }
-  return <Navigate to="/brands" replace />;
+  return <Navigate to="/dashboard" replace />;
 };
 
 export const AppRoutes: React.FC = () => {
