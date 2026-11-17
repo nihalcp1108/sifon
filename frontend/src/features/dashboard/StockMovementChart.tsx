@@ -3,102 +3,191 @@ import { useQuery } from '@tanstack/react-query';
 import { Calendar, ArrowDownToLine, ArrowUpFromLine, RefreshCw, AlertCircle } from 'lucide-react';
 import { purchasesApi } from '../purchases/purchasesApi';
 import { salesApi } from '../sales/salesApi';
+import { Purchase, Sale } from '../../types';
 import { cn } from '../../lib/utils';
 
 type DateRangeOption = 7 | 14 | 30;
 
 interface DayBucket {
-  dateStr: string; // YYYY-MM-DD
+  dateStr: string; // YYYY-MM-DD in business timezone
   displayDate: string; // "Nov 12"
   dayOfWeek: string; // "Wed"
   purchasesQty: number;
   salesQty: number;
 }
 
+/**
+ * Formats a Date into YYYY-MM-DD string in Asia/Kolkata business timezone
+ */
+function getBusinessDateStr(date: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+/**
+ * Fetches all pages of posted purchases within the date range, bounded to MAX_PAGES
+ */
+async function fetchAllPostedPurchases(
+  startDate: string,
+  endDate: string,
+  signal?: AbortSignal
+): Promise<{ purchases: Purchase[]; truncated: boolean }> {
+  const purchases: Purchase[] = [];
+  let page = 1;
+  const limit = 100; // Maximum allowed by backend purchaseQuerySchema
+  const MAX_PAGES = 10;
+  let truncated = false;
+
+  while (page <= MAX_PAGES) {
+    const res = await purchasesApi.getPurchases(
+      {
+        status: 'POSTED',
+        startDate,
+        endDate,
+        page,
+        limit,
+      },
+      signal
+    );
+
+    if (res?.data && Array.isArray(res.data)) {
+      purchases.push(...res.data);
+    }
+
+    const totalPages = res?.meta?.totalPages || 1;
+    if (page >= totalPages) break;
+    if (page === MAX_PAGES && totalPages > MAX_PAGES) {
+      truncated = true;
+      break;
+    }
+    page++;
+  }
+
+  return { purchases, truncated };
+}
+
+/**
+ * Fetches all pages of posted sales within the date range, bounded to MAX_PAGES
+ */
+async function fetchAllPostedSales(
+  startDate: string,
+  endDate: string,
+  signal?: AbortSignal
+): Promise<{ sales: Sale[]; truncated: boolean }> {
+  const sales: Sale[] = [];
+  let page = 1;
+  const limit = 100; // Maximum allowed by backend saleQuerySchema
+  const MAX_PAGES = 10;
+  let truncated = false;
+
+  while (page <= MAX_PAGES) {
+    const res = await salesApi.getSales(
+      {
+        status: 'POSTED',
+        startDate,
+        endDate,
+        page,
+        limit,
+      },
+      signal
+    );
+
+    if (res?.data && Array.isArray(res.data)) {
+      sales.push(...res.data);
+    }
+
+    const totalPages = res?.meta?.totalPages || 1;
+    if (page >= totalPages) break;
+    if (page === MAX_PAGES && totalPages > MAX_PAGES) {
+      truncated = true;
+      break;
+    }
+    page++;
+  }
+
+  return { sales, truncated };
+}
+
 export const StockMovementChart: React.FC = () => {
   const [selectedRange, setSelectedRange] = useState<DateRangeOption>(14);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  // Compute date strings for the query
+  // Compute inclusive date range in business timezone
   const { startDateStr, endDateStr, datesList } = useMemo(() => {
-    const dates: string[] = [];
     const today = new Date();
-    // Normalize to midnight
-    const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const start = new Date(end);
-    start.setDate(end.getDate() - (selectedRange - 1));
+    const dates: string[] = [];
 
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      dates.push(`${year}-${month}-${day}`);
+    for (let i = selectedRange - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(today.getDate() - i);
+      dates.push(getBusinessDateStr(d));
     }
 
+    const uniqueDates = Array.from(new Set(dates)).sort();
+
     return {
-      startDateStr: dates[0],
-      endDateStr: dates[dates.length - 1],
-      datesList: dates,
+      startDateStr: uniqueDates[0],
+      endDateStr: uniqueDates[uniqueDates.length - 1],
+      datesList: uniqueDates,
     };
   }, [selectedRange]);
 
-  // Fetch posted purchases in range
+  // Combined stock movements query
   const {
-    data: purchasesData,
-    isLoading: isPurchasesLoading,
-    error: purchasesError,
-    refetch: refetchPurchases,
+    data: movementData,
+    isLoading,
+    isFetching,
+    error,
+    refetch,
   } = useQuery({
-    queryKey: ['dashboard', 'movement-purchases', startDateStr, endDateStr],
-    queryFn: () =>
-      purchasesApi.getPurchases({
-        status: 'POSTED',
-        startDate: startDateStr,
-        endDate: endDateStr,
-        limit: 200,
-      }),
+    queryKey: ['dashboard', 'stock-movements', startDateStr, endDateStr],
+    queryFn: async ({ signal }) => {
+      const [purResult, saleResult] = await Promise.all([
+        fetchAllPostedPurchases(startDateStr, endDateStr, signal),
+        fetchAllPostedSales(startDateStr, endDateStr, signal),
+      ]);
+      return {
+        purchases: purResult.purchases,
+        sales: saleResult.sales,
+        truncated: purResult.truncated || saleResult.truncated,
+      };
+    },
     staleTime: 30000,
+    // Do not automatically retry 4xx validation errors
+    retry: (failureCount, err: any) => {
+      const status = err?.response?.status;
+      if (status && status >= 400 && status < 500) {
+        return false;
+      }
+      return failureCount < 1;
+    },
   });
 
-  // Fetch posted sales in range
-  const {
-    data: salesData,
-    isLoading: isSalesLoading,
-    error: salesError,
-    refetch: refetchSales,
-  } = useQuery({
-    queryKey: ['dashboard', 'movement-sales', startDateStr, endDateStr],
-    queryFn: () =>
-      salesApi.getSales({
-        status: 'POSTED',
-        startDate: startDateStr,
-        endDate: endDateStr,
-        limit: 200,
-      }),
-    staleTime: 30000,
-  });
+  const handleRetry = async () => {
+    try {
+      await refetch();
+    } catch (e) {
+      // Rejection handled cleanly
+      console.warn('Retry stock movement failed:', e);
+    }
+  };
 
-  const isLoading = isPurchasesLoading || isSalesLoading;
-  const error = purchasesError || salesError;
-
-  // Aggregate into daily buckets
+  // Aggregate daily buckets
   const { buckets, maxVal, totalPurchasedInPeriod, totalSoldInPeriod } = useMemo(() => {
     let totalPurchased = 0;
     let totalSold = 0;
 
-    // Map: dateStr -> { purchases: number, sales: number }
     const map = new Map<string, { purchases: number; sales: number }>();
     datesList.forEach((d) => map.set(d, { purchases: 0, sales: 0 }));
 
-    if (purchasesData?.data) {
-      for (const p of purchasesData.data) {
+    if (movementData?.purchases) {
+      for (const p of movementData.purchases) {
         if (!p.purchaseDate) continue;
-        const pDate = new Date(p.purchaseDate);
-        const y = pDate.getFullYear();
-        const m = String(pDate.getMonth() + 1).padStart(2, '0');
-        const d = String(pDate.getDate()).padStart(2, '0');
-        const key = `${y}-${m}-${d}`;
-
+        const key = getBusinessDateStr(new Date(p.purchaseDate));
         const entry = map.get(key);
         if (entry) {
           const qty = p.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
@@ -108,15 +197,10 @@ export const StockMovementChart: React.FC = () => {
       }
     }
 
-    if (salesData?.data) {
-      for (const s of salesData.data) {
+    if (movementData?.sales) {
+      for (const s of movementData.sales) {
         if (!s.saleDate) continue;
-        const sDate = new Date(s.saleDate);
-        const y = sDate.getFullYear();
-        const m = String(sDate.getMonth() + 1).padStart(2, '0');
-        const d = String(sDate.getDate()).padStart(2, '0');
-        const key = `${y}-${m}-${d}`;
-
+        const key = getBusinessDateStr(new Date(s.saleDate));
         const entry = map.get(key);
         if (entry) {
           const qty = s.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
@@ -147,10 +231,8 @@ export const StockMovementChart: React.FC = () => {
       if (b.salesQty > highest) highest = b.salesQty;
     });
 
-    // Determine scale ceiling
     let ceiling = 10;
     if (highest > 0) {
-      // Round up to nice number
       if (highest <= 10) ceiling = 10;
       else if (highest <= 25) ceiling = 25;
       else if (highest <= 50) ceiling = 50;
@@ -166,9 +248,9 @@ export const StockMovementChart: React.FC = () => {
       totalPurchasedInPeriod: totalPurchased,
       totalSoldInPeriod: totalSold,
     };
-  }, [datesList, purchasesData, salesData]);
+  }, [datesList, movementData]);
 
-  // SVG Chart Geometry
+  // Chart dimensions
   const chartHeight = 170;
   const chartWidth = 620;
   const paddingLeft = 40;
@@ -183,8 +265,8 @@ export const StockMovementChart: React.FC = () => {
   const barWidth = Math.max(Math.min(slotWidth * 0.36, 14), 4);
   const barGap = 2;
 
-  // Grid tick marks
   const yTicks = [0, Math.round(maxVal / 2), maxVal];
+  const hasMovements = totalPurchasedInPeriod > 0 || totalSoldInPeriod > 0;
 
   return (
     <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs p-5 flex flex-col justify-between transition-all hover:border-slate-300">
@@ -196,6 +278,11 @@ export const StockMovementChart: React.FC = () => {
             <span className="text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
               Posted Transactions
             </span>
+            {movementData?.truncated && (
+              <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                Sample bounded to 1,000 records
+              </span>
+            )}
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
             Purchases received vs sales dispatched over time
@@ -204,7 +291,7 @@ export const StockMovementChart: React.FC = () => {
 
         {/* Date Range Selector */}
         <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-lg border border-slate-200/60 self-start sm:self-auto">
-          <Calendar className="w-3.5 h-3.5 text-slate-400 ml-1.5 mr-0.5" />
+          <Calendar className="w-3.5 h-3.5 text-slate-400 ml-1.5 mr-0.5" aria-hidden="true" />
           {([7, 14, 30] as DateRangeOption[]).map((days) => (
             <button
               key={days}
@@ -249,6 +336,7 @@ export const StockMovementChart: React.FC = () => {
 
       {/* Main Visual Content */}
       <div className="relative mt-2 min-h-[190px] flex items-center justify-center">
+        {/* Loading State */}
         {isLoading && (
           <div className="w-full space-y-2 py-4">
             <div className="flex justify-between items-end h-40 gap-2 px-6">
@@ -264,23 +352,53 @@ export const StockMovementChart: React.FC = () => {
           </div>
         )}
 
+        {/* Error State with Accessible Real Icon and Retry */}
         {error && !isLoading && (
           <div className="p-6 text-center text-xs">
-            <AlertCircle className="w-6 h-6 text-rose-500 mx-auto mb-2" />
+            <AlertCircle className="w-6 h-6 text-rose-500 mx-auto mb-2" aria-hidden="true" />
             <p className="text-rose-600 font-medium">Failed to load stock movements.</p>
+            <p className="text-slate-400 text-[11px] mt-0.5">
+              {(error as any)?.response?.data?.message || 'An error occurred while loading movement records.'}
+            </p>
             <button
-              onClick={() => {
-                refetchPurchases();
-                refetchSales();
-              }}
-              className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-teal-700 bg-teal-50 border border-teal-200 rounded-lg hover:bg-teal-100 transition-colors"
+              type="button"
+              onClick={handleRetry}
+              disabled={isFetching}
+              aria-label="Retry loading stock movements"
+              className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-teal-700 bg-teal-50 border border-teal-200 rounded-lg hover:bg-teal-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <RefreshCw className="w-3.5 h-3.5" /> Retry
+              <RefreshCw
+                className={cn('w-3.5 h-3.5', isFetching && 'animate-spin')}
+                aria-hidden="true"
+              />
+              <span>{isFetching ? 'Retrying...' : 'Retry'}</span>
             </button>
           </div>
         )}
 
-        {!isLoading && !error && (
+        {/* Empty State: No movements in this date range */}
+        {!isLoading && !error && !hasMovements && (
+          <div className="py-10 text-center text-xs text-slate-500 space-y-2">
+            <Calendar className="w-8 h-8 text-slate-300 mx-auto mb-1" aria-hidden="true" />
+            <p className="font-semibold text-slate-700">No movements in this date range</p>
+            <p className="text-slate-400 text-[11px] max-w-sm mx-auto">
+              No posted purchases or sales were recorded between {buckets[0]?.displayDate} and{' '}
+              {buckets[buckets.length - 1]?.displayDate}.
+            </p>
+            {selectedRange < 30 && (
+              <button
+                type="button"
+                onClick={() => setSelectedRange(30)}
+                className="mt-2 text-xs font-semibold text-teal-600 hover:text-teal-700 underline"
+              >
+                Expand to 30 days
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Data Chart State */}
+        {!isLoading && !error && hasMovements && (
           <div className="w-full relative">
             <svg
               viewBox={`0 0 ${chartWidth} ${chartHeight}`}
@@ -328,7 +446,6 @@ export const StockMovementChart: React.FC = () => {
                 const pX = slotCenterX - barWidth - barGap / 2;
                 const sX = slotCenterX + barGap / 2;
 
-                // Should show X label? If 30 days, skip some labels to prevent overcrowding
                 const showLabel =
                   selectedRange <= 7 ||
                   (selectedRange === 14 && idx % 2 === 0) ||

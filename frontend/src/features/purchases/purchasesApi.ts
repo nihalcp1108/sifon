@@ -2,17 +2,21 @@ import { apiClient } from '../../lib/apiClient';
 import { Purchase, PaginationMeta } from '../../types';
 
 export const purchasesApi = {
-  getPurchases: async (params?: {
-    page?: number;
-    limit?: number;
-    status?: string;
-    productId?: string;
-    areaId?: string;
-    startDate?: string;
-    endDate?: string;
-  }) => {
+  getPurchases: async (
+    params?: {
+      page?: number;
+      limit?: number;
+      status?: string;
+      productId?: string;
+      areaId?: string;
+      startDate?: string;
+      endDate?: string;
+    },
+    signal?: AbortSignal
+  ) => {
     const res = await apiClient.get<{ data: Purchase[]; meta: PaginationMeta }>('/purchases', {
       params,
+      signal,
     });
     return res.data;
   },
