@@ -3,6 +3,7 @@ import { PurchaseController } from './purchase.controller.js';
 import { validateRequest } from '../../middleware/validate.js';
 import {
   createPurchaseSchema,
+  updatePurchaseSchema,
   updatePurchaseDraftSchema,
   cancelPurchaseSchema,
   purchaseQuerySchema,
@@ -23,7 +24,12 @@ router.post(
 router.get('/', validateRequest({ query: purchaseQuerySchema }), PurchaseController.getPurchases);
 router.get('/:id', PurchaseController.getPurchaseById);
 router.post('/:id/post', idempotencyMiddleware(), PurchaseController.postDraft);
-router.put('/:id', validateRequest({ body: updatePurchaseDraftSchema }), PurchaseController.updateDraft);
+router.put(
+  '/:id',
+  idempotencyMiddleware(),
+  validateRequest({ body: updatePurchaseSchema }),
+  PurchaseController.updatePurchase
+);
 router.delete('/:id', PurchaseController.deleteDraft);
 router.post(
   '/:id/cancel',

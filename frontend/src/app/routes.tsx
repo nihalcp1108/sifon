@@ -11,9 +11,11 @@ import { ProductDetailPage } from '../features/products/ProductDetailPage';
 import { PurchasesListPage } from '../features/purchases/PurchasesListPage';
 import { PurchaseCreatePage } from '../features/purchases/PurchaseCreatePage';
 import { PurchaseDetailPage } from '../features/purchases/PurchaseDetailPage';
+import { PurchaseEditPage } from '../features/purchases/PurchaseEditPage';
 import { SalesListPage } from '../features/sales/SalesListPage';
 import { SaleCreatePage } from '../features/sales/SaleCreatePage';
 import { SaleDetailPage } from '../features/sales/SaleDetailPage';
+import { SaleEditPage } from '../features/sales/SaleEditPage';
 import { ReturnsListPage } from '../features/returns/ReturnsListPage';
 import { ReturnCreatePage } from '../features/returns/ReturnCreatePage';
 import { ReturnDetailPage } from '../features/returns/ReturnDetailPage';
@@ -73,11 +75,13 @@ export const AppRoutes: React.FC = () => {
         <Route path="/purchases" element={<AdminRoute><PurchasesListPage /></AdminRoute>} />
         <Route path="/purchases/new" element={<AdminRoute><PurchaseCreatePage /></AdminRoute>} />
         <Route path="/purchases/:id" element={<AdminRoute><PurchaseDetailPage /></AdminRoute>} />
+        <Route path="/purchases/:id/edit" element={<AdminRoute><PurchaseEditPage /></AdminRoute>} />
 
         {/* 6. Sales */}
         <Route path="/sales" element={<AdminRoute><SalesListPage /></AdminRoute>} />
         <Route path="/sales/new" element={<AdminRoute><SaleCreatePage /></AdminRoute>} />
         <Route path="/sales/:id" element={<AdminRoute><SaleDetailPage /></AdminRoute>} />
+        <Route path="/sales/:id/edit" element={<AdminRoute><SaleEditPage /></AdminRoute>} />
 
         {/* 7. Returns */}
         <Route path="/returns" element={<AdminRoute><ReturnsListPage /></AdminRoute>} />

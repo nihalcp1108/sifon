@@ -490,5 +490,107 @@ describe('Unit Validation Tests', () => {
     expect(adminError).toBeDefined();
     expect(adminError?.errors?.['name']).toBeDefined();
   });
+
+  it('updatePurchaseSchema validates edit payloads, line items, and concurrency fields', async () => {
+    const { updatePurchaseSchema } = await import('../src/modules/purchases/purchase.validation.js');
+
+    const validPayload = {
+      reference: 'PO-2026-EDIT',
+      purchaseDate: '2026-11-17',
+      notes: 'Updated purchase notes',
+      expectedVersion: 2,
+      updatedAt: '2026-11-17T12:00:00.000Z',
+      items: [
+        {
+          productId: '507f1f77bcf86cd799439011',
+          receivingAreaId: '507f1f77bcf86cd799439012',
+          quantity: 25,
+          unitCost: 15.5,
+        },
+      ],
+    };
+
+    const parsed = updatePurchaseSchema.parse(validPayload);
+    expect(parsed.reference).toBe('PO-2026-EDIT');
+    expect(parsed.items?.[0].quantity).toBe(25);
+    expect(parsed.expectedVersion).toBe(2);
+
+    // Negative quantity rejected
+    expect(() =>
+      updatePurchaseSchema.parse({
+        items: [
+          {
+            productId: '507f1f77bcf86cd799439011',
+            receivingAreaId: '507f1f77bcf86cd799439012',
+            quantity: -5,
+          },
+        ],
+      })
+    ).toThrow();
+
+    // Empty productId rejected
+    expect(() =>
+      updatePurchaseSchema.parse({
+        items: [
+          {
+            productId: '   ',
+            receivingAreaId: '507f1f77bcf86cd799439012',
+            quantity: 5,
+          },
+        ],
+      })
+    ).toThrow();
+  });
+
+  it('updateSaleSchema validates edit payloads, line items, and concurrency fields', async () => {
+    const { updateSaleSchema } = await import('../src/modules/sales/sale.validation.js');
+
+    const validPayload = {
+      reference: 'SO-2026-EDIT',
+      saleDate: '2026-11-17',
+      notes: 'Updated sale instructions',
+      expectedVersion: 0,
+      updatedAt: '2026-11-17T12:00:00.000Z',
+      items: [
+        {
+          productId: '507f1f77bcf86cd799439011',
+          sourceAreaId: '507f1f77bcf86cd799439012',
+          quantity: 10,
+          unitPrice: 50,
+        },
+      ],
+    };
+
+    const parsed = updateSaleSchema.parse(validPayload);
+    expect(parsed.reference).toBe('SO-2026-EDIT');
+    expect(parsed.items?.[0].quantity).toBe(10);
+    expect(parsed.expectedVersion).toBe(0);
+
+    // Zero quantity rejected
+    expect(() =>
+      updateSaleSchema.parse({
+        items: [
+          {
+            productId: '507f1f77bcf86cd799439011',
+            sourceAreaId: '507f1f77bcf86cd799439012',
+            quantity: 0,
+          },
+        ],
+      })
+    ).toThrow();
+
+    // Empty sourceAreaId rejected
+    expect(() =>
+      updateSaleSchema.parse({
+        items: [
+          {
+            productId: '507f1f77bcf86cd799439011',
+            sourceAreaId: '   ',
+            quantity: 1,
+          },
+        ],
+      })
+    ).toThrow();
+  });
 });
 

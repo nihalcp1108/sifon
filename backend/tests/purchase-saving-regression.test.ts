@@ -31,8 +31,8 @@ describe('Purchase and Sale Saving Regression Suite', () => {
     adminToken = loginRes.body.data.token;
 
     // Create warehouse areas
-    const a1 = await AreaService.createArea({ areaNumber: 1, description: 'Receiving Area 1' });
-    const a2 = await AreaService.createArea({ areaNumber: 2, description: 'Receiving Area 2' });
+    const a1 = await AreaService.createArea({ name: 'Receiving Area 1', description: 'Receiving Area 1' });
+    const a2 = await AreaService.createArea({ name: 'Receiving Area 2', description: 'Receiving Area 2' });
     area1Id = a1._id.toString();
     area2Id = a2._id.toString();
 

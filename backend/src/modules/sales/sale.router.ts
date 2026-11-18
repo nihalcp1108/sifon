@@ -3,6 +3,7 @@ import { SaleController } from './sale.controller.js';
 import { validateRequest } from '../../middleware/validate.js';
 import {
   createSaleSchema,
+  updateSaleSchema,
   updateSaleDraftSchema,
   cancelSaleSchema,
   saleQuerySchema,
@@ -23,7 +24,12 @@ router.post(
 router.get('/', validateRequest({ query: saleQuerySchema }), SaleController.getSales);
 router.get('/:id', SaleController.getSaleById);
 router.post('/:id/post', idempotencyMiddleware(), SaleController.postDraft);
-router.put('/:id', validateRequest({ body: updateSaleDraftSchema }), SaleController.updateDraft);
+router.put(
+  '/:id',
+  idempotencyMiddleware(),
+  validateRequest({ body: updateSaleSchema }),
+  SaleController.updateSale
+);
 router.delete('/:id', SaleController.deleteDraft);
 router.post(
   '/:id/cancel',

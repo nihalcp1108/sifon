@@ -40,13 +40,21 @@ export class PurchaseController {
     }
   }
 
-  static async updateDraft(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  static async updatePurchase(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const purchase = await PurchaseService.updatePurchaseDraft(req.params.id as string, req.body);
-      return sendSuccess(res, purchase, `Purchase draft updated successfully`);
+      const purchase = await PurchaseService.updatePurchase(
+        req.params.id as string,
+        req.body,
+        req.user!._id.toString()
+      );
+      return sendSuccess(res, purchase, `Purchase ${purchase.reference} updated successfully`);
     } catch (error) {
       next(error);
     }
+  }
+
+  static async updateDraft(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    return PurchaseController.updatePurchase(req, res, next);
   }
 
   static async deleteDraft(req: AuthenticatedRequest, res: Response, next: NextFunction) {

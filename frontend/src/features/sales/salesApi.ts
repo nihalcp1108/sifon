@@ -53,6 +53,26 @@ export const salesApi = {
     return res.data.data;
   },
 
+  updateSale: async (
+    id: string,
+    data: {
+      reference?: string;
+      saleDate?: string;
+      items?: { productId: string; sourceAreaId: string; quantity: number }[];
+      notes?: string;
+      expectedVersion?: number;
+      updatedAt?: string;
+    },
+    idempotencyKey?: string
+  ): Promise<Sale> => {
+    const headers: Record<string, string> = {};
+    if (idempotencyKey) {
+      headers['X-Idempotency-Key'] = idempotencyKey;
+    }
+    const res = await apiClient.put<{ data: Sale }>(`/sales/${id}`, data, { headers });
+    return res.data.data;
+  },
+
   updateDraft: async (id: string, data: any): Promise<Sale> => {
     const res = await apiClient.put<{ data: Sale }>(`/sales/${id}`, data);
     return res.data.data;

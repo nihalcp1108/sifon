@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Check, AlertCircle, Ban, Trash2 } from 'lucide-react';
+import { ArrowLeft, Check, AlertCircle, Ban, Trash2, Pencil } from 'lucide-react';
 import { purchasesApi } from './purchasesApi';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/common/Button';
@@ -142,6 +142,18 @@ export const PurchaseDetailPage: React.FC = () => {
                   Delete
                 </Button>
               </>
+            )}
+
+            {purchase.status !== 'CANCELLED' && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => navigate(`/purchases/${id}/edit`)}
+                leftIcon={<Pencil className="w-4 h-4 text-slate-600" />}
+                className="text-xs"
+              >
+                Edit Purchase
+              </Button>
             )}
 
             {purchase.status === 'POSTED' && (

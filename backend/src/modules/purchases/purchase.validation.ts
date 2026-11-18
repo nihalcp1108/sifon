@@ -45,11 +45,16 @@ export const createPurchaseSchema = z.object({
   isDraft: z.boolean().optional().default(false),
 });
 
-export const updatePurchaseDraftSchema = z.object({
+export const updatePurchaseSchema = z.object({
+  reference: optionalReferenceSchema,
   purchaseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format').optional(),
   items: z.array(purchaseItemSchema).min(1, 'At least one line item is required').optional(),
   notes: optionalNotesSchema,
+  expectedVersion: z.number().int().optional(),
+  updatedAt: z.string().optional(),
 });
+
+export const updatePurchaseDraftSchema = updatePurchaseSchema;
 
 export const cancelPurchaseSchema = z.object({
   reason: z.string().trim().min(3, 'A cancellation reason is required (min 3 chars)').max(500),
@@ -66,6 +71,7 @@ export const purchaseQuerySchema = z.object({
 });
 
 export type CreatePurchaseInput = z.infer<typeof createPurchaseSchema>;
+export type UpdatePurchaseInput = z.infer<typeof updatePurchaseSchema>;
 export type UpdatePurchaseDraftInput = z.infer<typeof updatePurchaseDraftSchema>;
 export type CancelPurchaseInput = z.infer<typeof cancelPurchaseSchema>;
 export type PurchaseQueryInput = z.infer<typeof purchaseQuerySchema>;

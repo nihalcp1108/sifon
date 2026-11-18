@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingBag, Plus, Eye } from 'lucide-react';
+import { ShoppingBag, Plus, Eye, Pencil } from 'lucide-react';
 import { salesApi } from './salesApi';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/common/Button';
@@ -196,7 +196,18 @@ export const SalesListPage: React.FC = () => {
                           {s.status}
                         </Badge>
                       </td>
-                      <td className="py-3.5 px-6 text-right">
+                      <td className="py-3.5 px-6 text-right whitespace-nowrap space-x-1.5">
+                        {s.status !== 'CANCELLED' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => navigate(`/sales/${s._id}/edit`)}
+                            leftIcon={<Pencil className="w-3.5 h-3.5 text-slate-500" />}
+                            className="text-xs text-slate-600 hover:text-navy-950"
+                          >
+                            Edit
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"

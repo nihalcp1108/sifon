@@ -40,13 +40,21 @@ export class SaleController {
     }
   }
 
-  static async updateDraft(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  static async updateSale(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const sale = await SaleService.updateSaleDraft(req.params.id as string, req.body);
-      return sendSuccess(res, sale, 'Sale draft updated successfully');
+      const sale = await SaleService.updateSale(
+        req.params.id as string,
+        req.body,
+        req.user!._id.toString()
+      );
+      return sendSuccess(res, sale, `Sale ${sale.reference} updated successfully`);
     } catch (error) {
       next(error);
     }
+  }
+
+  static async updateDraft(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    return SaleController.updateSale(req, res, next);
   }
 
   static async deleteDraft(req: AuthenticatedRequest, res: Response, next: NextFunction) {

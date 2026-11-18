@@ -17,6 +17,7 @@ export interface Brand {
   productCount?: number;
   createdAt: string;
   updatedAt: string;
+  __v?: number;
 }
 
 export interface Category {
@@ -27,6 +28,7 @@ export interface Category {
   productCount?: number;
   createdAt: string;
   updatedAt: string;
+  __v?: number;
 }
 
 export interface Section {
@@ -37,6 +39,7 @@ export interface Section {
   areaCount?: number;
   createdAt: string;
   updatedAt: string;
+  __v?: number;
 }
 
 export interface Area {
@@ -51,6 +54,7 @@ export interface Area {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  __v?: number;
 }
 
 export type Location = Area;
@@ -64,6 +68,7 @@ export interface AreaBalance {
   damagedQuantity: number;
   createdAt: string;
   updatedAt: string;
+  __v?: number;
 }
 
 export interface Product {
@@ -82,6 +87,7 @@ export interface Product {
   areaBalances?: AreaBalance[];
   createdAt: string;
   updatedAt: string;
+  __v?: number;
 }
 
 export interface ProductDetail extends Product {
@@ -143,6 +149,7 @@ export interface Purchase {
   postedAt?: string;
   createdAt: string;
   updatedAt: string;
+  __v?: number;
 }
 
 export interface SaleItem {
@@ -167,6 +174,7 @@ export interface Sale {
   postedAt?: string;
   createdAt: string;
   updatedAt: string;
+  __v?: number;
 }
 
 export interface ReturnRecord {
@@ -188,6 +196,7 @@ export interface ReturnRecord {
   createdBy: { _id: string; name: string; email: string };
   createdAt: string;
   updatedAt: string;
+  __v?: number;
 }
 
 export interface DamagedBalanceItem {

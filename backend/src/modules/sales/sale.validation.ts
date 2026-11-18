@@ -45,11 +45,16 @@ export const createSaleSchema = z.object({
   isDraft: z.boolean().optional().default(false),
 });
 
-export const updateSaleDraftSchema = z.object({
+export const updateSaleSchema = z.object({
+  reference: optionalReferenceSchema,
   saleDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format').optional(),
   items: z.array(saleItemSchema).min(1, 'At least one line item is required').optional(),
   notes: optionalNotesSchema,
+  expectedVersion: z.number().int().optional(),
+  updatedAt: z.string().optional(),
 });
+
+export const updateSaleDraftSchema = updateSaleSchema;
 
 export const cancelSaleSchema = z.object({
   reason: z.string().trim().min(3, 'A cancellation reason is required (min 3 chars)').max(500),
@@ -66,6 +71,7 @@ export const saleQuerySchema = z.object({
 });
 
 export type CreateSaleInput = z.infer<typeof createSaleSchema>;
+export type UpdateSaleInput = z.infer<typeof updateSaleSchema>;
 export type UpdateSaleDraftInput = z.infer<typeof updateSaleDraftSchema>;
 export type CancelSaleInput = z.infer<typeof cancelSaleSchema>;
 export type SaleQueryInput = z.infer<typeof saleQuerySchema>;

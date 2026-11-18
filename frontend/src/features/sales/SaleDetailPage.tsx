@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Check, AlertCircle, Ban, Trash2, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Check, AlertCircle, Ban, Trash2, RotateCcw, Pencil } from 'lucide-react';
 import { salesApi } from './salesApi';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/common/Button';
@@ -122,6 +122,18 @@ export const SaleDetailPage: React.FC = () => {
             >
               {sale.status}
             </Badge>
+
+            {sale.status !== 'CANCELLED' && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => navigate(`/sales/${id}/edit`)}
+                leftIcon={<Pencil className="w-4 h-4 text-slate-600" />}
+                className="text-xs"
+              >
+                Edit Sale
+              </Button>
+            )}
 
             {sale.status === 'POSTED' && (
               <Button
