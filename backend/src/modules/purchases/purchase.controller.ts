@@ -57,13 +57,21 @@ export class PurchaseController {
     return PurchaseController.updatePurchase(req, res, next);
   }
 
-  static async deleteDraft(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  static async deletePurchase(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      await PurchaseService.deletePurchaseDraft(req.params.id as string);
-      return sendSuccess(res, { success: true }, `Purchase draft deleted successfully`);
+      const result = await PurchaseService.deletePurchase(
+        req.params.id as string,
+        req.user!._id.toString(),
+        req.body?.reason
+      );
+      return sendSuccess(res, result, `Purchase ${result.reference} deleted successfully`);
     } catch (error) {
       next(error);
     }
+  }
+
+  static async deleteDraft(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    return PurchaseController.deletePurchase(req, res, next);
   }
 
   static async cancelPurchase(req: AuthenticatedRequest, res: Response, next: NextFunction) {

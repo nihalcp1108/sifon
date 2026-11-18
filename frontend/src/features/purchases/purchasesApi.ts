@@ -78,8 +78,19 @@ export const purchasesApi = {
     return res.data.data;
   },
 
+  deletePurchase: async (id: string, idempotencyKey?: string, reason?: string): Promise<void> => {
+    const headers: Record<string, string> = {};
+    if (idempotencyKey) {
+      headers['X-Idempotency-Key'] = idempotencyKey;
+    }
+    await apiClient.delete(`/purchases/${id}`, {
+      headers,
+      data: reason ? { reason } : undefined,
+    });
+  },
+
   deleteDraft: async (id: string): Promise<void> => {
-    await apiClient.delete(`/purchases/${id}`);
+    return purchasesApi.deletePurchase(id);
   },
 
   cancelPurchase: async (

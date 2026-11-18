@@ -57,13 +57,21 @@ export class SaleController {
     return SaleController.updateSale(req, res, next);
   }
 
-  static async deleteDraft(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  static async deleteSale(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      await SaleService.deleteSaleDraft(req.params.id as string);
-      return sendSuccess(res, { success: true }, 'Sale draft deleted successfully');
+      const result = await SaleService.deleteSale(
+        req.params.id as string,
+        req.user!._id.toString(),
+        req.body?.reason
+      );
+      return sendSuccess(res, result, `Sale ${result.reference} deleted successfully`);
     } catch (error) {
       next(error);
     }
+  }
+
+  static async deleteDraft(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    return SaleController.deleteSale(req, res, next);
   }
 
   static async cancelSale(req: AuthenticatedRequest, res: Response, next: NextFunction) {

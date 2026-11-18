@@ -287,4 +287,74 @@ describe('Purchase & Sale Edit Routes Express Integration Tests', () => {
       adminUserId
     );
   });
+
+  it('9. DELETE /api/v1/purchases/:id rejects unauthenticated request with 401', async () => {
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    const res = await dispatchRequest(app, 'DELETE', `/api/v1/purchases/${fakeId}`, {});
+    expect(res.status).toBe(401);
+  });
+
+  it('10. DELETE /api/v1/purchases/:id rejects PRODUCT_VIEWER with 403', async () => {
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    const res = await dispatchRequest(
+      app,
+      'DELETE',
+      `/api/v1/purchases/${fakeId}`,
+      { Authorization: `Bearer ${viewerToken}` }
+    );
+    expect(res.status).toBe(403);
+    expect(res.body.message).toMatch(/Admin access required/i);
+  });
+
+  it('11. DELETE /api/v1/sales/:id rejects unauthenticated request with 401', async () => {
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    const res = await dispatchRequest(app, 'DELETE', `/api/v1/sales/${fakeId}`, {});
+    expect(res.status).toBe(401);
+  });
+
+  it('12. DELETE /api/v1/sales/:id rejects PRODUCT_VIEWER with 403', async () => {
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    const res = await dispatchRequest(
+      app,
+      'DELETE',
+      `/api/v1/sales/${fakeId}`,
+      { Authorization: `Bearer ${viewerToken}` }
+    );
+    expect(res.status).toBe(403);
+    expect(res.body.message).toMatch(/Admin access required/i);
+  });
+
+  it('13. DELETE /api/v1/purchases/:id forwards valid request to PurchaseService.deletePurchase', async () => {
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    const deleteSpy = vi
+      .spyOn(PurchaseService, 'deletePurchase')
+      .mockResolvedValue({ success: true, reference: 'PO-DEL-101' });
+
+    const res = await dispatchRequest(
+      app,
+      'DELETE',
+      `/api/v1/purchases/${fakeId}`,
+      { Authorization: `Bearer ${adminToken}` }
+    );
+
+    expect(res.status).toBe(200);
+    expect(deleteSpy).toHaveBeenCalledWith(fakeId, adminUserId, undefined);
+  });
+
+  it('14. DELETE /api/v1/sales/:id forwards valid request to SaleService.deleteSale', async () => {
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    const deleteSpy = vi
+      .spyOn(SaleService, 'deleteSale')
+      .mockResolvedValue({ success: true, reference: 'SO-DEL-101' });
+
+    const res = await dispatchRequest(
+      app,
+      'DELETE',
+      `/api/v1/sales/${fakeId}`,
+      { Authorization: `Bearer ${adminToken}` }
+    );
+
+    expect(res.status).toBe(200);
+    expect(deleteSpy).toHaveBeenCalledWith(fakeId, adminUserId, undefined);
+  });
 });

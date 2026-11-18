@@ -30,7 +30,7 @@ router.put(
   validateRequest({ body: updatePurchaseSchema }),
   PurchaseController.updatePurchase
 );
-router.delete('/:id', PurchaseController.deleteDraft);
+router.delete('/:id', idempotencyMiddleware(), PurchaseController.deletePurchase);
 router.post(
   '/:id/cancel',
   idempotencyMiddleware(),

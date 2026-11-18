@@ -9,6 +9,7 @@ import { Badge } from '../../components/common/Badge';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { Skeleton } from '../../components/common/Skeleton';
 import { useToast } from '../../components/common/Toast';
+import { useAuth } from '../auth/useAuth';
 import { formatDate, generateIdempotencyKey } from '../../lib/utils';
 
 export const PurchaseDetailPage: React.FC = () => {
@@ -16,6 +17,8 @@ export const PurchaseDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -40,15 +43,19 @@ export const PurchaseDetailPage: React.FC = () => {
     },
   });
 
-  const deleteDraftMutation = useMutation({
-    mutationFn: () => purchasesApi.deleteDraft(id!),
+  const deleteMutation = useMutation({
+    mutationFn: () => purchasesApi.deletePurchase(id!, generateIdempotencyKey('del-pur')),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchases'] });
-      toast.success('Purchase draft deleted successfully.');
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['areas'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      toast.success(`Purchase ${purchase?.reference} deleted successfully.`);
       navigate('/purchases');
     },
     onError: (err: any) => {
-      toast.error(err.message || 'Failed to delete purchase draft');
+      toast.error(err.response?.data?.message || err.message || 'Failed to delete purchase');
     },
   });
 
@@ -122,26 +129,15 @@ export const PurchaseDetailPage: React.FC = () => {
             </Badge>
 
             {purchase.status === 'DRAFT' && (
-              <>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={() => postMutation.mutate()}
-                  isLoading={postMutation.isPending}
-                  leftIcon={<Check className="w-4 h-4 text-teal-400" />}
-                >
-                  Post Draft
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setDeleteModalOpen(true)}
-                  leftIcon={<Trash2 className="w-4 h-4 text-rose-500" />}
-                  className="text-rose-600 hover:text-rose-700"
-                >
-                  Delete
-                </Button>
-              </>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => postMutation.mutate()}
+                isLoading={postMutation.isPending}
+                leftIcon={<Check className="w-4 h-4 text-teal-400" />}
+              >
+                Post Draft
+              </Button>
             )}
 
             {purchase.status !== 'CANCELLED' && (
@@ -165,6 +161,18 @@ export const PurchaseDetailPage: React.FC = () => {
                 className="text-rose-600 border-rose-200 hover:bg-rose-50"
               >
                 Cancel / Reverse Purchase
+              </Button>
+            )}
+
+            {isAdmin && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setDeleteModalOpen(true)}
+                leftIcon={<Trash2 className="w-4 h-4 text-rose-500" />}
+                className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+              >
+                Delete Purchase
               </Button>
             )}
           </div>
@@ -279,17 +287,24 @@ export const PurchaseDetailPage: React.FC = () => {
         }}
       />
 
-      {/* Delete Draft Dialog */}
+      {/* Delete Purchase Dialog */}
       <ConfirmDialog
         isOpen={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
-        title="Delete Purchase Draft?"
-        message="Are you sure you want to delete this purchase draft? Unposted drafts have not changed inventory and can be safely deleted."
-        confirmText="Delete Draft"
+        title={`Delete Purchase: ${purchase.reference}`}
+        message={
+          purchase.status === 'POSTED'
+            ? `Are you sure you want to delete purchase "${purchase.reference}"? Deleting this purchase will permanently remove the record and reverse its stock effect by subtracting ${totalUnits} unit(s) from the receiving location(s). Deletion will be rejected if any receiving location has insufficient remaining stock.`
+            : purchase.status === 'DRAFT'
+            ? `Are you sure you want to delete purchase draft "${purchase.reference}"? Unposted drafts have not changed inventory and can be safely deleted.`
+            : `Are you sure you want to delete cancelled purchase "${purchase.reference}"? This record was already cancelled and its inventory reversed; deleting it will remove it without affecting stock.`
+        }
+        confirmText="Confirm Delete"
+        cancelText="Cancel"
         variant="danger"
-        isLoading={deleteDraftMutation.isPending}
+        isLoading={deleteMutation.isPending}
         onConfirm={async () => {
-          await deleteDraftMutation.mutateAsync();
+          await deleteMutation.mutateAsync();
         }}
       />
     </div>

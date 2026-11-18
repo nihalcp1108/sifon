@@ -1,21 +1,31 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Truck, Plus, Eye, Pencil } from 'lucide-react';
+import { Truck, Plus, Eye, Pencil, Trash2 } from 'lucide-react';
 import { purchasesApi } from './purchasesApi';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { Pagination } from '../../components/common/Pagination';
 import { TableSkeleton } from '../../components/common/Skeleton';
-import { formatDate } from '../../lib/utils';
+import { ConfirmDialog } from '../../components/common/ConfirmDialog';
+import { useToast } from '../../components/common/Toast';
+import { useAuth } from '../auth/useAuth';
+import { formatDate, generateIdempotencyKey } from '../../lib/utils';
+import { Purchase } from '../../types';
 
 export const PurchasesListPage: React.FC = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [purchaseToDelete, setPurchaseToDelete] = useState<Purchase | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['purchases', 'list', page, statusFilter, startDate, endDate],
@@ -27,6 +37,23 @@ export const PurchasesListPage: React.FC = () => {
         startDate: startDate || undefined,
         endDate: endDate || undefined,
       }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (purchase: Purchase) =>
+      purchasesApi.deletePurchase(purchase._id, generateIdempotencyKey('del-pur')),
+    onSuccess: (_, purchase) => {
+      queryClient.invalidateQueries({ queryKey: ['purchases'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['areas'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      toast.success(`Purchase ${purchase.reference} deleted successfully.`);
+      setPurchaseToDelete(null);
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || err.message || 'Failed to delete purchase');
+    },
   });
 
   const purchases = data?.data || [];
@@ -206,6 +233,17 @@ export const PurchasesListPage: React.FC = () => {
                         >
                           Details
                         </Button>
+                        {isAdmin && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setPurchaseToDelete(p)}
+                            leftIcon={<Trash2 className="w-3.5 h-3.5 text-rose-500" />}
+                            className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                          >
+                            Delete
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -225,6 +263,32 @@ export const PurchasesListPage: React.FC = () => {
           />
         )}
       </div>
+
+      {/* Delete Purchase Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={!!purchaseToDelete}
+        onClose={() => setPurchaseToDelete(null)}
+        title={`Delete Purchase: ${purchaseToDelete?.reference || ''}`}
+        message={
+          purchaseToDelete?.status === 'POSTED'
+            ? `Are you sure you want to delete purchase "${purchaseToDelete.reference}"? Deleting this purchase will permanently remove the record and reverse its stock effect by subtracting ${purchaseToDelete.items.reduce(
+                (sum, item) => sum + item.quantity,
+                0
+              )} unit(s) from the receiving location(s). Deletion will be rejected if any location has insufficient remaining stock.`
+            : purchaseToDelete?.status === 'DRAFT'
+            ? `Are you sure you want to delete draft purchase "${purchaseToDelete.reference}"? Unposted drafts have not changed inventory and will be deleted without affecting stock.`
+            : `Are you sure you want to delete cancelled purchase "${purchaseToDelete?.reference}"? This record was already cancelled and its inventory reversed; deleting it will remove it from the list without affecting stock.`
+        }
+        confirmText="Confirm Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={deleteMutation.isPending}
+        onConfirm={async () => {
+          if (purchaseToDelete) {
+            await deleteMutation.mutateAsync(purchaseToDelete);
+          }
+        }}
+      />
     </div>
   );
 };

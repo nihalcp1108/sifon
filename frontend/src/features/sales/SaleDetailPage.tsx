@@ -9,6 +9,7 @@ import { Badge } from '../../components/common/Badge';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { Skeleton } from '../../components/common/Skeleton';
 import { useToast } from '../../components/common/Toast';
+import { useAuth } from '../auth/useAuth';
 import { formatDate, generateIdempotencyKey } from '../../lib/utils';
 
 export const SaleDetailPage: React.FC = () => {
@@ -16,6 +17,8 @@ export const SaleDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -40,15 +43,19 @@ export const SaleDetailPage: React.FC = () => {
     },
   });
 
-  const deleteDraftMutation = useMutation({
-    mutationFn: () => salesApi.deleteDraft(id!),
+  const deleteMutation = useMutation({
+    mutationFn: () => salesApi.deleteSale(id!, generateIdempotencyKey('del-sal')),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
-      toast.success('Sale draft deleted successfully.');
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['areas'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      toast.success(`Sale ${sale?.reference} deleted successfully.`);
       navigate('/sales');
     },
     onError: (err: any) => {
-      toast.error(err.message || 'Failed to delete sale draft');
+      toast.error(err.response?.data?.message || err.message || 'Failed to delete sale');
     },
   });
 
@@ -147,26 +154,15 @@ export const SaleDetailPage: React.FC = () => {
             )}
 
             {sale.status === 'DRAFT' && (
-              <>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={() => postMutation.mutate()}
-                  isLoading={postMutation.isPending}
-                  leftIcon={<Check className="w-4 h-4 text-teal-400" />}
-                >
-                  Post Draft
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setDeleteModalOpen(true)}
-                  leftIcon={<Trash2 className="w-4 h-4 text-rose-500" />}
-                  className="text-rose-600 hover:text-rose-700"
-                >
-                  Delete
-                </Button>
-              </>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => postMutation.mutate()}
+                isLoading={postMutation.isPending}
+                leftIcon={<Check className="w-4 h-4 text-teal-400" />}
+              >
+                Post Draft
+              </Button>
             )}
 
             {sale.status === 'POSTED' && (
@@ -178,6 +174,18 @@ export const SaleDetailPage: React.FC = () => {
                 className="text-rose-600 border-rose-200 hover:bg-rose-50"
               >
                 Cancel / Reverse Sale
+              </Button>
+            )}
+
+            {isAdmin && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setDeleteModalOpen(true)}
+                leftIcon={<Trash2 className="w-4 h-4 text-rose-500" />}
+                className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+              >
+                Delete Sale
               </Button>
             )}
           </div>
@@ -319,17 +327,31 @@ export const SaleDetailPage: React.FC = () => {
         }}
       />
 
-      {/* Delete Draft Dialog */}
+      {/* Delete Sale Dialog */}
       <ConfirmDialog
         isOpen={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
-        title="Delete Sale Draft?"
-        message="Are you sure you want to delete this sale draft? Unposted drafts have not changed inventory and can be safely deleted."
-        confirmText="Delete Draft"
+        title={`Delete Sale: ${sale.reference}`}
+        message={
+          hasActiveReturns
+            ? `CANNOT DELETE: Active customer returns currently exist against this sale (${sale.reference}). In accordance with inventory integrity rules, all associated customer returns must be reversed or cancelled before this sale can be deleted.`
+            : sale.status === 'POSTED'
+            ? `Are you sure you want to delete sale "${sale.reference}"? Deleting this sale will permanently remove the record and reverse its stock effect by restoring ${totalSold} unit(s) back to the original source location(s).`
+            : sale.status === 'DRAFT'
+            ? `Are you sure you want to delete draft sale "${sale.reference}"? Unposted drafts have not changed inventory and will be deleted without affecting stock.`
+            : `Are you sure you want to delete cancelled sale "${sale.reference}"? This record was already cancelled and its inventory restored; deleting it will remove it from the list without affecting stock.`
+        }
+        confirmText={hasActiveReturns ? 'Deletion Blocked' : 'Confirm Delete'}
+        cancelText="Cancel"
         variant="danger"
-        isLoading={deleteDraftMutation.isPending}
+        isLoading={deleteMutation.isPending}
         onConfirm={async () => {
-          await deleteDraftMutation.mutateAsync();
+          if (hasActiveReturns) {
+            toast.error('Sale deletion blocked: Reverse active returns first.');
+            setDeleteModalOpen(false);
+            return;
+          }
+          await deleteMutation.mutateAsync();
         }}
       />
     </div>

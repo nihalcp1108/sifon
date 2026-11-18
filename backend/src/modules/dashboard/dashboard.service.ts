@@ -37,7 +37,7 @@ export class DashboardService {
     const todayPurchasesAgg = await InventoryMovement.aggregate([
       {
         $match: {
-          movementType: 'PURCHASE',
+          movementType: { $in: ['PURCHASE', 'PURCHASE_REVERSAL'] },
           businessDate: { $gte: todayStartUtc, $lt: todayEndUtc },
         },
       },
@@ -48,27 +48,27 @@ export class DashboardService {
         },
       },
     ]);
-    const todayPurchasedQuantity = todayPurchasesAgg[0]?.total || 0;
+    const todayPurchasedQuantity = Math.max(0, todayPurchasesAgg[0]?.total || 0);
 
     // 5. Today's sold quantity
     const todaySalesAgg = await InventoryMovement.aggregate([
       {
         $match: {
-          movementType: 'SALE',
+          movementType: { $in: ['SALE', 'SALE_REVERSAL'] },
           businessDate: { $gte: todayStartUtc, $lt: todayEndUtc },
         },
       },
       {
         $group: {
           _id: null,
-          total: { $sum: { $abs: '$availableDelta' } },
+          total: { $sum: { $multiply: ['$availableDelta', -1] } },
         },
       },
     ]);
-    const todaySoldQuantity = todaySalesAgg[0]?.total || 0;
+    const todaySoldQuantity = Math.max(0, todaySalesAgg[0]?.total || 0);
 
     // 6. Recent purchases (latest 5)
-    const recentPurchases = await Purchase.find()
+    const recentPurchases = await Purchase.find({ isDeleted: { $ne: true } })
       .populate('items.productId', 'code name unit')
       .populate('items.receivingAreaId', 'name areaNumber description')
       .populate('createdBy', 'name')
@@ -77,7 +77,7 @@ export class DashboardService {
       .lean();
 
     // 7. Recent sales (latest 5)
-    const recentSales = await Sale.find()
+    const recentSales = await Sale.find({ isDeleted: { $ne: true } })
       .populate('items.productId', 'code name unit')
       .populate('items.sourceAreaId', 'name areaNumber description')
       .populate('createdBy', 'name')

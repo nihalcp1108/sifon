@@ -1,21 +1,31 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingBag, Plus, Eye, Pencil } from 'lucide-react';
+import { ShoppingBag, Plus, Eye, Pencil, Trash2 } from 'lucide-react';
 import { salesApi } from './salesApi';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { Pagination } from '../../components/common/Pagination';
 import { TableSkeleton } from '../../components/common/Skeleton';
-import { formatDate } from '../../lib/utils';
+import { ConfirmDialog } from '../../components/common/ConfirmDialog';
+import { useToast } from '../../components/common/Toast';
+import { useAuth } from '../auth/useAuth';
+import { formatDate, generateIdempotencyKey } from '../../lib/utils';
+import { Sale } from '../../types';
 
 export const SalesListPage: React.FC = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [saleToDelete, setSaleToDelete] = useState<Sale | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['sales', 'list', page, statusFilter, startDate, endDate],
@@ -27,6 +37,23 @@ export const SalesListPage: React.FC = () => {
         startDate: startDate || undefined,
         endDate: endDate || undefined,
       }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (sale: Sale) =>
+      salesApi.deleteSale(sale._id, generateIdempotencyKey('del-sal')),
+    onSuccess: (_, sale) => {
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['areas'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      toast.success(`Sale ${sale.reference} deleted successfully.`);
+      setSaleToDelete(null);
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || err.message || 'Failed to delete sale');
+    },
   });
 
   const sales = data?.data || [];
@@ -217,6 +244,17 @@ export const SalesListPage: React.FC = () => {
                         >
                           Details
                         </Button>
+                        {isAdmin && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setSaleToDelete(s)}
+                            leftIcon={<Trash2 className="w-3.5 h-3.5 text-rose-500" />}
+                            className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                          >
+                            Delete
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -236,6 +274,32 @@ export const SalesListPage: React.FC = () => {
           />
         )}
       </div>
+
+      {/* Delete Sale Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={!!saleToDelete}
+        onClose={() => setSaleToDelete(null)}
+        title={`Delete Sale: ${saleToDelete?.reference || ''}`}
+        message={
+          saleToDelete?.status === 'POSTED'
+            ? `Are you sure you want to delete sale "${saleToDelete.reference}"? Deleting this sale will permanently remove the record and reverse its stock effect by restoring ${saleToDelete.items.reduce(
+                (sum, item) => sum + item.quantity,
+                0
+              )} unit(s) back to the source dispatch location(s). Deletion will be rejected if active customer returns exist against this sale.`
+            : saleToDelete?.status === 'DRAFT'
+            ? `Are you sure you want to delete draft sale "${saleToDelete.reference}"? Unposted drafts have not changed inventory and will be deleted without affecting stock.`
+            : `Are you sure you want to delete cancelled sale "${saleToDelete?.reference}"? This record was already cancelled and its inventory restored; deleting it will remove it from the list without affecting stock.`
+        }
+        confirmText="Confirm Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={deleteMutation.isPending}
+        onConfirm={async () => {
+          if (saleToDelete) {
+            await deleteMutation.mutateAsync(saleToDelete);
+          }
+        }}
+      />
     </div>
   );
 };

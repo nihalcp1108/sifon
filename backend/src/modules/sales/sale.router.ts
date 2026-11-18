@@ -30,7 +30,7 @@ router.put(
   validateRequest({ body: updateSaleSchema }),
   SaleController.updateSale
 );
-router.delete('/:id', SaleController.deleteDraft);
+router.delete('/:id', idempotencyMiddleware(), SaleController.deleteSale);
 router.post(
   '/:id/cancel',
   idempotencyMiddleware(),

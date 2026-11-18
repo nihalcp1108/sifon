@@ -101,7 +101,7 @@ export class SaleService {
 
   static async postSaleDraft(saleId: string, userId: string): Promise<ISale> {
     const sale = await Sale.findById(saleId);
-    if (!sale) {
+    if (!sale || sale.isDeleted) {
       throw new NotFoundError('Sale not found');
     }
     if (sale.status !== 'DRAFT') {
@@ -154,7 +154,7 @@ export class SaleService {
   ): Promise<ISale> {
     return await runInTransaction(async session => {
       const sale = await Sale.findById(saleId).session(session);
-      if (!sale) {
+      if (!sale || sale.isDeleted) {
         throw new NotFoundError('Sale not found');
       }
 
@@ -424,21 +424,94 @@ export class SaleService {
     return this.updateSale(saleId, input, userId || 'system');
   }
 
-  static async deleteSaleDraft(saleId: string): Promise<void> {
-    const sale = await Sale.findById(saleId);
-    if (!sale) {
-      throw new NotFoundError('Sale not found');
-    }
-    if (sale.status !== 'DRAFT') {
-      throw new BadRequestError('Only draft sales can be deleted');
-    }
+  static async deleteSale(
+    saleId: string,
+    userId: string,
+    reason?: string
+  ): Promise<{ success: boolean; reference: string }> {
+    return await runInTransaction(async session => {
+      const sale = await Sale.findById(saleId).session(session);
+      if (!sale || sale.isDeleted) {
+        throw new NotFoundError('Sale not found');
+      }
 
-    await Sale.findByIdAndDelete(saleId);
+      // 1. Check linked customer returns
+      const linkedReturns = await Return.find({ saleId: sale._id, status: 'POSTED' }).session(session);
+      if (linkedReturns.length > 0) {
+        const returnRefs = linkedReturns.map(r => r.reference).join(', ');
+        throw new BadRequestError(
+          `Cannot delete sale: this sale is linked to active customer return(s) (${returnRefs}). Please cancel or resolve the linked returns first.`
+        );
+      }
+
+      // 2. If posted, restore inventory and ledger atomically
+      if (sale.status === 'POSTED') {
+        for (const item of sale.items) {
+          await InventoryService.adjustStock(
+            {
+              productId: item.productId,
+              areaId: item.sourceAreaId,
+              availableDelta: item.quantity, // Restores stock
+              movementType: 'SALE_REVERSAL',
+              sourceDocumentType: 'SALE',
+              sourceDocumentId: sale._id,
+              sourceDocumentLineId: item._id,
+              businessDate: sale.saleDate || new Date(),
+              createdBy: userId,
+              reason: `Sale ${sale.reference} deleted: stock restored`,
+              notes: reason || 'Sale deleted by administrator',
+            },
+            session
+          );
+        }
+      }
+
+      // Soft delete the record
+      sale.isDeleted = true;
+      sale.deletedAt = new Date();
+      sale.deletedBy = new mongoose.Types.ObjectId(userId);
+      if (reason) {
+        sale.deletionReason = reason;
+      }
+      await sale.save({ session });
+
+      // Audit Log
+      await AuditLog.create(
+        [
+          {
+            entityType: 'SALE',
+            entityId: sale._id,
+            action: 'DELETE',
+            performedBy: new mongoose.Types.ObjectId(userId),
+            details: {
+              reference: sale.reference,
+              saleDate: sale.saleDate,
+              status: sale.status,
+              restoredStock: sale.status === 'POSTED',
+              items: sale.items.map(i => ({
+                productId: i.productId.toString(),
+                sourceAreaId: i.sourceAreaId.toString(),
+                quantity: i.quantity,
+              })),
+              reason,
+            },
+            timestamp: new Date(),
+          },
+        ],
+        { session }
+      );
+
+      return { success: true, reference: sale.reference };
+    });
+  }
+
+  static async deleteSaleDraft(saleId: string, userId?: string): Promise<void> {
+    await this.deleteSale(saleId, userId || 'system', 'Sale draft deleted');
   }
 
   static async cancelSale(saleId: string, input: CancelSaleInput, userId: string): Promise<ISale> {
     const sale = await Sale.findById(saleId);
-    if (!sale) {
+    if (!sale || sale.isDeleted) {
       throw new NotFoundError('Sale not found');
     }
     if (sale.status !== 'POSTED') {
@@ -465,7 +538,7 @@ export class SaleService {
             sourceDocumentType: 'SALE',
             sourceDocumentId: sale._id,
             sourceDocumentLineId: item._id,
-            businessDate: new Date(),
+            businessDate: sale.saleDate || new Date(),
             createdBy: userId,
             reason: input.reason,
           },
@@ -484,7 +557,7 @@ export class SaleService {
   }
 
   static async getSales(query: SaleQueryInput) {
-    const filter: Record<string, any> = {};
+    const filter: Record<string, any> = { isDeleted: { $ne: true } };
 
     if (query.status) {
       filter.status = query.status;
@@ -533,7 +606,7 @@ export class SaleService {
   }
 
   static async getSaleById(id: string): Promise<ISale> {
-    const sale = await Sale.findById(id)
+    const sale = await Sale.findOne({ _id: id, isDeleted: { $ne: true } })
       .populate('items.productId', 'code name unit')
       .populate('items.sourceAreaId', 'name areaNumber description')
       .populate('createdBy', 'name email')

@@ -20,6 +20,10 @@ export interface ISale extends Document {
   cancellationReason?: string;
   cancelledAt?: Date;
   cancelledBy?: mongoose.Types.ObjectId;
+  isDeleted?: boolean;
+  deletedAt?: Date;
+  deletedBy?: mongoose.Types.ObjectId;
+  deletionReason?: string;
   createdBy: mongoose.Types.ObjectId;
   postedAt?: Date;
   createdAt: Date;
@@ -104,6 +108,22 @@ const SaleSchema = new Schema<ISale>(
     cancelledBy: {
       type: Schema.Types.ObjectId,
       ref: 'User',
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    deletedAt: {
+      type: Date,
+    },
+    deletedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    deletionReason: {
+      type: String,
+      trim: true,
     },
     createdBy: {
       type: Schema.Types.ObjectId,

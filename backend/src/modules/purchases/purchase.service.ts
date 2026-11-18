@@ -99,7 +99,7 @@ export class PurchaseService {
 
   static async postPurchaseDraft(purchaseId: string, userId: string): Promise<IPurchase> {
     const purchase = await Purchase.findById(purchaseId);
-    if (!purchase) {
+    if (!purchase || purchase.isDeleted) {
       throw new NotFoundError('Purchase not found');
     }
     if (purchase.status !== 'DRAFT') {
@@ -152,7 +152,7 @@ export class PurchaseService {
   ): Promise<IPurchase> {
     return await runInTransaction(async session => {
       const purchase = await Purchase.findById(purchaseId).session(session);
-      if (!purchase) {
+      if (!purchase || purchase.isDeleted) {
         throw new NotFoundError('Purchase not found');
       }
 
@@ -377,16 +377,119 @@ export class PurchaseService {
     return this.updatePurchase(purchaseId, input, userId || 'system');
   }
 
-  static async deletePurchaseDraft(purchaseId: string): Promise<void> {
-    const purchase = await Purchase.findById(purchaseId);
-    if (!purchase) {
-      throw new NotFoundError('Purchase not found');
-    }
-    if (purchase.status !== 'DRAFT') {
-      throw new BadRequestError('Only draft purchases can be deleted');
-    }
+  static async deletePurchase(
+    purchaseId: string,
+    userId: string,
+    reason?: string
+  ): Promise<{ success: boolean; reference: string }> {
+    return await runInTransaction(async session => {
+      const purchase = await Purchase.findById(purchaseId).session(session);
+      if (!purchase || purchase.isDeleted) {
+        throw new NotFoundError('Purchase not found');
+      }
 
-    await Purchase.findByIdAndDelete(purchaseId);
+      // If posted, reverse inventory atomically after checking for negative stock
+      if (purchase.status === 'POSTED') {
+        // 1. Group items by product and location to accurately handle duplicates
+        const groupedMap = new Map<
+          string,
+          { productId: mongoose.Types.ObjectId; areaId: mongoose.Types.ObjectId; quantity: number }
+        >();
+        for (const item of purchase.items) {
+          const key = `${item.productId.toString()}_${item.receivingAreaId.toString()}`;
+          const existing = groupedMap.get(key);
+          if (existing) {
+            existing.quantity += item.quantity;
+          } else {
+            groupedMap.set(key, {
+              productId: item.productId,
+              areaId: item.receivingAreaId,
+              quantity: item.quantity,
+            });
+          }
+        }
+
+        // 2. Validate that subtracting stock won't result in negative available balance
+        for (const g of groupedMap.values()) {
+          const balance = await InventoryBalance.findOne({
+            productId: g.productId,
+            areaId: g.areaId,
+          }).session(session);
+
+          const currentAvailable = balance?.availableQuantity || 0;
+          if (currentAvailable < g.quantity) {
+            const prod = await Product.findById(g.productId).session(session);
+            const area = await Area.findById(g.areaId).session(session);
+            const prodName = prod?.name || 'Product';
+            const areaName = area?.displayName || area?.name || 'Location';
+            throw new BadRequestError(
+              `Cannot delete purchase: subtracting ${g.quantity} units of "${prodName}" from location "${areaName}" would result in negative available stock. Current available stock is ${currentAvailable}.`
+            );
+          }
+        }
+
+        // 3. Apply reversing stock adjustments
+        for (const item of purchase.items) {
+          await InventoryService.adjustStock(
+            {
+              productId: item.productId,
+              areaId: item.receivingAreaId,
+              availableDelta: -item.quantity, // Reduces stock
+              movementType: 'PURCHASE_REVERSAL',
+              sourceDocumentType: 'PURCHASE',
+              sourceDocumentId: purchase._id,
+              sourceDocumentLineId: item._id,
+              businessDate: purchase.purchaseDate || new Date(),
+              createdBy: userId,
+              reason: `Purchase ${purchase.reference} deleted: stock reversed`,
+              notes: reason || 'Purchase deleted by administrator',
+            },
+            session
+          );
+        }
+      }
+
+      // Soft delete the record
+      purchase.isDeleted = true;
+      purchase.deletedAt = new Date();
+      purchase.deletedBy = new mongoose.Types.ObjectId(userId);
+      if (reason) {
+        purchase.deletionReason = reason;
+      }
+      await purchase.save({ session });
+
+      // Audit Log
+      await AuditLog.create(
+        [
+          {
+            entityType: 'PURCHASE',
+            entityId: purchase._id,
+            action: 'DELETE',
+            performedBy: new mongoose.Types.ObjectId(userId),
+            details: {
+              reference: purchase.reference,
+              purchaseDate: purchase.purchaseDate,
+              status: purchase.status,
+              reversedStock: purchase.status === 'POSTED',
+              items: purchase.items.map(i => ({
+                productId: i.productId.toString(),
+                receivingAreaId: i.receivingAreaId.toString(),
+                quantity: i.quantity,
+              })),
+              reason,
+            },
+            timestamp: new Date(),
+          },
+        ],
+        { session }
+      );
+
+      return { success: true, reference: purchase.reference };
+    });
+  }
+
+  static async deletePurchaseDraft(purchaseId: string, userId?: string): Promise<void> {
+    await this.deletePurchase(purchaseId, userId || 'system', 'Purchase draft deleted');
   }
 
   static async cancelPurchase(
@@ -395,7 +498,7 @@ export class PurchaseService {
     userId: string
   ): Promise<IPurchase> {
     const purchase = await Purchase.findById(purchaseId);
-    if (!purchase) {
+    if (!purchase || purchase.isDeleted) {
       throw new NotFoundError('Purchase not found');
     }
     if (purchase.status !== 'POSTED') {
@@ -433,7 +536,7 @@ export class PurchaseService {
   }
 
   static async getPurchases(query: PurchaseQueryInput) {
-    const filter: Record<string, any> = {};
+    const filter: Record<string, any> = { isDeleted: { $ne: true } };
 
     if (query.status) {
       filter.status = query.status;
@@ -482,7 +585,7 @@ export class PurchaseService {
   }
 
   static async getPurchaseById(id: string): Promise<IPurchase> {
-    const purchase = await Purchase.findById(id)
+    const purchase = await Purchase.findOne({ _id: id, isDeleted: { $ne: true } })
       .populate('items.productId', 'code name unit')
       .populate('items.receivingAreaId', 'name areaNumber description')
       .populate('createdBy', 'name email')
